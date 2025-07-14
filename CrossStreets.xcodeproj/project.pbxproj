@@ -6,7 +6,20 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		BA7DE7212E21740E0054BF90 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = BA7DE7202E21740E0054BF90 /* WidgetKit.framework */; };
+		BA7DE7232E21740E0054BF90 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = BA7DE7222E21740E0054BF90 /* SwiftUI.framework */; };
+		BA7DE7342E21740F0054BF90 /* CrossStreetsWidgetExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = BA7DE71E2E21740E0054BF90 /* CrossStreetsWidgetExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
+		BA7DE7322E21740F0054BF90 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = BACEEA452E21695F00A0E01B /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = BA7DE71D2E21740E0054BF90;
+			remoteInfo = CrossStreetsWidgetExtension;
+		};
 		BACEEA5B2E21696100A0E01B /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = BACEEA452E21695F00A0E01B /* Project object */;
@@ -23,15 +36,61 @@
 		};
 /* End PBXContainerItemProxy section */
 
+/* Begin PBXCopyFilesBuildPhase section */
+		BA7DE7392E21740F0054BF90 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				BA7DE7342E21740F0054BF90 /* CrossStreetsWidgetExtension.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
+		BA7DE71E2E21740E0054BF90 /* CrossStreetsWidgetExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = CrossStreetsWidgetExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		BA7DE7202E21740E0054BF90 /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
+		BA7DE7222E21740E0054BF90 /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
+		BA7DE73A2E2175110054BF90 /* CrossStreetsWidgetExtension.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = CrossStreetsWidgetExtension.entitlements; sourceTree = "<group>"; };
 		BACEEA4D2E21695F00A0E01B /* CrossStreets.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = CrossStreets.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		BACEEA5A2E21696100A0E01B /* CrossStreetsTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = CrossStreetsTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		BACEEA642E21696100A0E01B /* CrossStreetsUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = CrossStreetsUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		BA7DE7382E21740F0054BF90 /* Exceptions for "CrossStreetsWidget" folder in "CrossStreetsWidgetExtension" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = BA7DE71D2E21740E0054BF90 /* CrossStreetsWidgetExtension */;
+		};
+		BACEEA792E216B1D00A0E01B /* Exceptions for "CrossStreets" folder in "CrossStreets" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = BACEEA4C2E21695F00A0E01B /* CrossStreets */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
+		BA7DE7242E21740E0054BF90 /* CrossStreetsWidget */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				BA7DE7382E21740F0054BF90 /* Exceptions for "CrossStreetsWidget" folder in "CrossStreetsWidgetExtension" target */,
+			);
+			path = CrossStreetsWidget;
+			sourceTree = "<group>";
+		};
 		BACEEA4F2E21695F00A0E01B /* CrossStreets */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				BACEEA792E216B1D00A0E01B /* Exceptions for "CrossStreets" folder in "CrossStreets" target */,
+			);
 			path = CrossStreets;
 			sourceTree = "<group>";
 		};
@@ -48,6 +107,15 @@
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		BA7DE71B2E21740E0054BF90 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				BA7DE7232E21740E0054BF90 /* SwiftUI.framework in Frameworks */,
+				BA7DE7212E21740E0054BF90 /* WidgetKit.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		BACEEA4A2E21695F00A0E01B /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -72,12 +140,24 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		BA7DE71F2E21740E0054BF90 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				BA7DE7202E21740E0054BF90 /* WidgetKit.framework */,
+				BA7DE7222E21740E0054BF90 /* SwiftUI.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
 		BACEEA442E21695F00A0E01B = {
 			isa = PBXGroup;
 			children = (
+				BA7DE73A2E2175110054BF90 /* CrossStreetsWidgetExtension.entitlements */,
 				BACEEA4F2E21695F00A0E01B /* CrossStreets */,
 				BACEEA5D2E21696100A0E01B /* CrossStreetsTests */,
 				BACEEA672E21696100A0E01B /* CrossStreetsUITests */,
+				BA7DE7242E21740E0054BF90 /* CrossStreetsWidget */,
+				BA7DE71F2E21740E0054BF90 /* Frameworks */,
 				BACEEA4E2E21695F00A0E01B /* Products */,
 			);
 			sourceTree = "<group>";
@@ -88,6 +168,7 @@
 				BACEEA4D2E21695F00A0E01B /* CrossStreets.app */,
 				BACEEA5A2E21696100A0E01B /* CrossStreetsTests.xctest */,
 				BACEEA642E21696100A0E01B /* CrossStreetsUITests.xctest */,
+				BA7DE71E2E21740E0054BF90 /* CrossStreetsWidgetExtension.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -95,6 +176,28 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		BA7DE71D2E21740E0054BF90 /* CrossStreetsWidgetExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = BA7DE7352E21740F0054BF90 /* Build configuration list for PBXNativeTarget "CrossStreetsWidgetExtension" */;
+			buildPhases = (
+				BA7DE71A2E21740E0054BF90 /* Sources */,
+				BA7DE71B2E21740E0054BF90 /* Frameworks */,
+				BA7DE71C2E21740E0054BF90 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				BA7DE7242E21740E0054BF90 /* CrossStreetsWidget */,
+			);
+			name = CrossStreetsWidgetExtension;
+			packageProductDependencies = (
+			);
+			productName = CrossStreetsWidgetExtension;
+			productReference = BA7DE71E2E21740E0054BF90 /* CrossStreetsWidgetExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 		BACEEA4C2E21695F00A0E01B /* CrossStreets */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = BACEEA6E2E21696100A0E01B /* Build configuration list for PBXNativeTarget "CrossStreets" */;
@@ -102,10 +205,12 @@
 				BACEEA492E21695F00A0E01B /* Sources */,
 				BACEEA4A2E21695F00A0E01B /* Frameworks */,
 				BACEEA4B2E21695F00A0E01B /* Resources */,
+				BA7DE7392E21740F0054BF90 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				BA7DE7332E21740F0054BF90 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				BACEEA4F2E21695F00A0E01B /* CrossStreets */,
@@ -173,6 +278,9 @@
 				LastSwiftUpdateCheck = 1630;
 				LastUpgradeCheck = 1630;
 				TargetAttributes = {
+					BA7DE71D2E21740E0054BF90 = {
+						CreatedOnToolsVersion = 16.3;
+					};
 					BACEEA4C2E21695F00A0E01B = {
 						CreatedOnToolsVersion = 16.3;
 					};
@@ -203,11 +311,19 @@
 				BACEEA4C2E21695F00A0E01B /* CrossStreets */,
 				BACEEA592E21696100A0E01B /* CrossStreetsTests */,
 				BACEEA632E21696100A0E01B /* CrossStreetsUITests */,
+				BA7DE71D2E21740E0054BF90 /* CrossStreetsWidgetExtension */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		BA7DE71C2E21740E0054BF90 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		BACEEA4B2E21695F00A0E01B /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -232,6 +348,13 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		BA7DE71A2E21740E0054BF90 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		BACEEA492E21695F00A0E01B /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -256,6 +379,11 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
+		BA7DE7332E21740F0054BF90 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = BA7DE71D2E21740E0054BF90 /* CrossStreetsWidgetExtension */;
+			targetProxy = BA7DE7322E21740F0054BF90 /* PBXContainerItemProxy */;
+		};
 		BACEEA5C2E21696100A0E01B /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = BACEEA4C2E21695F00A0E01B /* CrossStreets */;
@@ -269,6 +397,66 @@
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
+		BA7DE7362E21740F0054BF90 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_ENTITLEMENTS = CrossStreetsWidgetExtension.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = FML3KZR4YS;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = CrossStreetsWidget/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = CrossStreetsWidget;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.6;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = Tyler.CrossStreets.CrossStreetsWidget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		BA7DE7372E21740F0054BF90 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_ENTITLEMENTS = CrossStreetsWidgetExtension.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = FML3KZR4YS;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = CrossStreetsWidget/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = CrossStreetsWidget;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.6;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = Tyler.CrossStreets.CrossStreetsWidget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
 		BACEEA6C2E21696100A0E01B /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -393,15 +581,21 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = CrossStreets/CrossStreets.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = FML3KZR4YS;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = CrossStreets/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = CrossStreets;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.6;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -409,6 +603,7 @@
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = Tyler.CrossStreets;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -420,15 +615,21 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = CrossStreets/CrossStreets.entitlements;
+				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = FML3KZR4YS;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = CrossStreets/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = CrossStreets;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.6;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -436,6 +637,7 @@
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = Tyler.CrossStreets;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -448,8 +650,9 @@
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = FML3KZR4YS;
 				GENERATE_INFOPLIST_FILE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 18.4;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.6;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = Tyler.CrossStreetsTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -466,8 +669,9 @@
 				BUNDLE_LOADER = "$(TEST_HOST)";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = FML3KZR4YS;
 				GENERATE_INFOPLIST_FILE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 18.4;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.6;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = Tyler.CrossStreetsTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -483,7 +687,9 @@
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = FML3KZR4YS;
 				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.6;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = Tyler.CrossStreetsUITests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -499,7 +705,9 @@
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = FML3KZR4YS;
 				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.6;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = Tyler.CrossStreetsUITests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -513,6 +721,15 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		BA7DE7352E21740F0054BF90 /* Build configuration list for PBXNativeTarget "CrossStreetsWidgetExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				BA7DE7362E21740F0054BF90 /* Debug */,
+				BA7DE7372E21740F0054BF90 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		BACEEA482E21695F00A0E01B /* Build configuration list for PBXProject "CrossStreets" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
