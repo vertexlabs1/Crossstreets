@@ -19,6 +19,7 @@ struct NotParkedStateView: View {
             
             Button(action: {
                 // Add immediate visual feedback
+                print("🔍 DEBUG: Park Here button pressed!")
                 isButtonPressed = true
                 HapticManager.lightImpact()
                 
@@ -28,6 +29,7 @@ struct NotParkedStateView: View {
                 }
                 
                 detectedGarageName = nil
+                print("🔍 DEBUG: About to call locationManager.detectParkingType()")
                 locationManager.detectParkingType()
             }) {
                 HStack(spacing: 10) {

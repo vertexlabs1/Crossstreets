@@ -36,9 +36,9 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     
     struct GarageAltitudeData: Codable {
         let garageName: String
-        let floorElevations: [String: Double] // [floor: altitude]
-        let totalCorrections: Int
-        let lastUpdated: Date
+        var floorElevations: [String: Double] // [floor: altitude]
+        var totalCorrections: Int
+        var lastUpdated: Date
         let gpsAccuracy: Double
         let barometricAvailable: Bool
     }
@@ -133,97 +133,65 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     }
     
     private func checkForNearbyStores(at location: CLLocation, completion: @escaping (String?) -> Void) {
-        let searchRequest = MKLocalSearch.Request()
-        searchRequest.naturalLanguageQuery = "store restaurant shop"
-        searchRequest.region = MKCoordinateRegion(
+        // First, search specifically for malls and shopping centers
+        let mallSearchRequest = MKLocalSearch.Request()
+        mallSearchRequest.naturalLanguageQuery = "mall shopping center plaza outlet"
+        mallSearchRequest.region = MKCoordinateRegion(
             center: location.coordinate,
             span: MKCoordinateSpan(latitudeDelta: 0.002, longitudeDelta: 0.002)
         )
-        let search = MKLocalSearch(request: searchRequest)
-        search.start { response, error in
-            guard let response = response, error == nil else {
-                completion(nil)
-                return
-            }
-            let nearbyItems = response.mapItems.filter { item in
-                let distance = location.distance(from: item.placemark.location ?? CLLocation())
-                return distance <= 200
-            }.sorted { item1, item2 in
-                let distance1 = location.distance(from: item1.placemark.location ?? CLLocation())
-                let distance2 = location.distance(from: item2.placemark.location ?? CLLocation())
-                return distance1 < distance2
-            }
-            let preferredKeywords = [
-                "apple", "starbucks", "mcdonalds", "burger king", "wendys", "subway",
-                "target", "walmart", "costco", "best buy", "home depot", "lowes",
-                "cheesecake factory", "olive garden", "red lobster", "outback",
-                "chili's", "tgi fridays", "buffalo wild wings", "chipotle",
-                "panera", "dunkin", "dominos", "pizza hut", "kfc", "popeyes"
-            ]
-            for item in nearbyItems {
-                let name = item.name?.lowercased() ?? ""
-                for keyword in preferredKeywords {
-                    if name.contains(keyword) {
-                        completion(item.name)
-                        return
-                    }
-                }
-            }
-            for item in nearbyItems {
-                let category = item.pointOfInterestCategory
-                if category == .store || category == .restaurant || category == .foodMarket {
-                    completion(item.name)
-                    return
-                }
-            }
-            let mallSearchRequest = MKLocalSearch.Request()
-            mallSearchRequest.naturalLanguageQuery = "mall shopping center"
-            mallSearchRequest.region = MKCoordinateRegion(
-                center: location.coordinate,
-                span: MKCoordinateSpan(latitudeDelta: 0.001, longitudeDelta: 0.001)
-            )
-            let mallSearch = MKLocalSearch(request: mallSearchRequest)
-            mallSearch.start { mallResponse, mallError in
-                if let mallResponse = mallResponse {
-                    for mallItem in mallResponse.mapItems {
-                        let distance = location.distance(from: mallItem.placemark.location ?? CLLocation())
-                        if distance <= 300 {
-                            completion(mallItem.name)
-                            return
+        let mallSearch = MKLocalSearch(request: mallSearchRequest)
+        mallSearch.start { mallResponse, mallError in
+            if let mallResponse = mallResponse {
+                for mallItem in mallResponse.mapItems {
+                    let distance = location.distance(from: mallItem.placemark.location ?? CLLocation())
+                    if distance <= 500 { // Increased range for malls
+                        let name = mallItem.name?.lowercased() ?? ""
+                        // Check if it's actually a mall/shopping center
+                        let mallKeywords = ["mall", "shopping center", "shopping centre", "plaza", "outlet", "galleria", "marketplace", "town center", "town centre"]
+                        for keyword in mallKeywords {
+                            if name.contains(keyword) {
+                                completion("Near \(mallItem.name ?? "Shopping Center")")
+                                return
+                            }
                         }
                     }
                 }
-                completion(nil)
             }
+            
+            // If no mall found, don't show individual stores
+            completion(nil)
         }
     }
     
     func requestLocationPermission() {
-        guard CLLocationManager.locationServicesEnabled() else {
+        // Move location services check to background queue to prevent UI blocking
+        DispatchQueue.global(qos: .userInitiated).async {
+            let locationServicesEnabled = CLLocationManager.locationServicesEnabled()
+            
             DispatchQueue.main.async {
-                self.showLocationServicesAlert()
-                self.locationPermissionError = "Location Services are disabled. Please enable them in Settings."
+                guard locationServicesEnabled else {
+                    self.showLocationServicesAlert()
+                    self.locationPermissionError = "Location Services are disabled. Please enable them in Settings."
+                    return
+                }
+                
+                // Use the current authorization status from our published property instead of calling it directly
+                switch self.authorizationStatus {
+                case .notDetermined:
+                    self.locationManager.requestWhenInUseAuthorization()
+                case .authorizedWhenInUse, .authorizedAlways:
+                    self.locationManager.startUpdatingLocation()
+                    self.isLocationEnabled = true
+                    self.locationPermissionError = nil
+                case .denied, .restricted:
+                    self.isLocationEnabled = false
+                    self.showLocationPermissionAlert()
+                    self.locationPermissionError = "Location permission denied. Please enable location access in Settings."
+                @unknown default:
+                    break
+                }
             }
-            return
-        }
-        
-        switch locationManager.authorizationStatus {
-        case .notDetermined:
-            locationManager.requestWhenInUseAuthorization()
-        case .authorizedWhenInUse, .authorizedAlways:
-            locationManager.startUpdatingLocation()
-            DispatchQueue.main.async {
-                self.isLocationEnabled = true
-                self.locationPermissionError = nil
-            }
-        case .denied, .restricted:
-            DispatchQueue.main.async {
-                self.isLocationEnabled = false
-                self.showLocationPermissionAlert()
-                self.locationPermissionError = "Location permission denied. Please enable location access in Settings."
-            }
-        @unknown default:
-            break
         }
     }
     
@@ -248,7 +216,10 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     }
     
     func requestLocation() {
-        locationManager.requestLocation()
+        // Ensure this runs on the main thread as it's a UI-triggered action
+        DispatchQueue.main.async {
+            self.locationManager.requestLocation()
+        }
     }
     
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
@@ -305,69 +276,74 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     }
     
     func detectParkingType(completion: @escaping () -> Void = {}) {
+        print("🚗 Starting parking detection...")
+        print("🔍 DEBUG: Button pressed - detectParkingType called")
+        debugLocationStatus()
         isDetectingParking = true
         
-        guard let location = currentLocation else { 
-            print("⚠️ Cannot detect parking: No current location available")
+        // Reduced global timeout for faster response
+        let globalTimeout = DispatchTime.now() + 6.0 // Reduced from 10s to 6s
+        
+        DispatchQueue.main.asyncAfter(deadline: globalTimeout) { [weak self] in
+            guard let self = self, self.isDetectingParking else { return }
+            print("⚠️ Parking detection timed out globally")
+            self.isDetectingParking = false
+            self.saveParkedLocation(floor: nil)
+            self.detectedGarageInfo = (false, nil)
+            completion()
+        }
+        
+        guard let currentLocation = currentLocation else {
+            print("❌ currentLocation is nil - this is the issue!")
             isDetectingParking = false
             completion()
-            return 
-        }
-        
-        // More lenient accuracy check for underground garages
-        guard location.horizontalAccuracy <= 200 else {
-            print("⚠️ Location accuracy too low: \(location.horizontalAccuracy)m")
-            // Still try to save location even with poor accuracy for underground garages
-            self.saveParkedLocation(floor: nil)
-            self.detectedGarageInfo = (false, nil)
-            self.isDetectingParking = false
-            completion()
             return
         }
         
-        // Check if we're online for map searches
+        // Check network connectivity first
         let isOnline = checkNetworkConnectivity()
+        
         if !isOnline {
-            print("⚠️ Offline mode: Using basic parking detection")
-            // Fall back to basic parking detection without map search
+            print("❌ No network connectivity - parking directly")
+            self.isDetectingParking = false
             self.saveParkedLocation(floor: nil)
             self.detectedGarageInfo = (false, nil)
-            self.isDetectingParking = false
             completion()
             return
         }
         
-        // Add timeout for parking detection
-        let detectionTimeout = DispatchTime.now() + 15.0 // Increased to 15 second timeout
+        // Reduced detection timeout for faster response
+        let detectionTimeout = DispatchTime.now() + 4.0 // Reduced from 8s to 4s
         
-        checkForParkingGarage(at: location) { [weak self] isInGarage, garageName in
-            DispatchQueue.main.async {
-                // Check if we're still within timeout
-                guard DispatchTime.now() <= detectionTimeout else {
-                    print("⚠️ Parking detection timed out")
-                    // Save location even if garage detection fails
-                    self?.saveParkedLocation(floor: nil)
-                    self?.detectedGarageInfo = (false, nil)
-                    self?.isDetectingParking = false
-                    completion()
-                    return
-                }
-                
-                if isInGarage {
-                    self?.detectedGarageInfo = (true, garageName)
-                    self?.sendGarageFloorNotification(garageName: garageName)
-                } else {
-                    self?.saveParkedLocation(floor: nil)
-                    self?.detectedGarageInfo = (false, nil)
-                }
-                self?.isDetectingParking = false
-                completion()
+        DispatchQueue.main.asyncAfter(deadline: detectionTimeout) { [weak self] in
+            guard let self = self, self.isDetectingParking else { return }
+            print("⏱️ Garage detection timed out, parking directly")
+            self.isDetectingParking = false
+            self.saveParkedLocation(floor: nil)
+            self.detectedGarageInfo = (false, nil)
+            completion()
+        }
+        
+        // Start garage detection with faster search
+        self.checkForParkingGarage(at: currentLocation) { [weak self] isInGarage, garageName in
+            guard let self = self, self.isDetectingParking else { return }
+            
+            print("🏢 Garage detection result: \(isInGarage ? "Found" : "Not found") - \(garageName ?? "None")")
+            
+            self.isDetectingParking = false
+            if isInGarage {
+                self.detectedGarageInfo = (true, garageName)
+                self.sendGarageFloorNotification(garageName: garageName)
+            } else {
+                self.saveParkedLocation(floor: nil)
+                self.detectedGarageInfo = (false, nil)
             }
+            completion()
         }
     }
     
     private func checkNetworkConnectivity() -> Bool {
-        // More robust network check
+        // More robust network check with timeout
         let monitor = NWPathMonitor()
         var isConnected = false
         let semaphore = DispatchSemaphore(value: 0)
@@ -381,16 +357,22 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
         monitor.start(queue: queue)
         
         // Wait for a short time to get the network status
-        _ = semaphore.wait(timeout: .now() + 0.5)
+        let result = semaphore.wait(timeout: .now() + 1.0) // Reduced timeout to 1 second
         monitor.cancel()
         
+        if result == .timedOut {
+            print("⚠️ Network check timed out, assuming offline")
+            return false
+        }
+        
+        print("🌐 Network check completed: \(isConnected ? "Online" : "Offline")")
         return isConnected
     }
     
     // MARK: - Performance Optimizations
     
     private func optimizeLocationAccuracy() {
-        guard let location = currentLocation else { return }
+        guard currentLocation != nil else { return }
         
         // Reduce location accuracy for better performance when not actively parking
         if parkedLocation == nil {
@@ -416,40 +398,65 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     }
     
     private func checkForParkingGarage(at location: CLLocation, completion: @escaping (Bool, String?) -> Void) {
+        print("🔍 Starting garage search...")
+        
+        // Add a flag to ensure completion is only called once
+        var garageSearchCompleted = false
+        
+        func completeOnce(_ found: Bool, _ name: String?) {
+            if !garageSearchCompleted {
+                garageSearchCompleted = true
+                completion(found, name)
+            }
+        }
+        
+        // Reduced timeout for faster response
+        let searchTimeout = DispatchTime.now() + 3.0 // Reduced from 6s to 3s
+        
         performParkingSearch(at: location, query: "parking garage") { found, name in
+            print("🔍 'parking garage' search result: \(found ? "Found" : "Not found") - \(name ?? "None")")
             if found {
-                completion(true, name)
+                completeOnce(true, name)
             } else {
                 self.performParkingSearch(at: location, query: "parking") { found2, name2 in
+                    print("🔍 'parking' search result: \(found2 ? "Found" : "Not found") - \(name2 ?? "None")")
                     if found2 {
-                        completion(true, name2)
+                        completeOnce(true, name2)
                     } else {
-                        // Try additional search terms for better garage detection
-                        self.performParkingSearch(at: location, query: "garage") { found3, name3 in
-                            completion(found3, name3)
-                        }
+                        // Skip the third search for speed - just complete
+                        print("🔍 Skipping third search for speed")
+                        completeOnce(false, nil)
                     }
                 }
             }
         }
+        
+        // Fallback timeout
+        DispatchQueue.main.asyncAfter(deadline: searchTimeout) {
+            print("⚠️ Garage search timed out, completing with no garage found")
+            completeOnce(false, nil)
+        }
     }
     
     private func performParkingSearch(at location: CLLocation, query: String, completion: @escaping (Bool, String?) -> Void) {
+        print("🔍 Performing search for: '\(query)'")
         performParkingSearchWithRetry(at: location, query: query, retryCount: 0, completion: completion)
     }
     
     private func performParkingSearchWithRetry(at location: CLLocation, query: String, retryCount: Int, completion: @escaping (Bool, String?) -> Void) {
+        print("🔍 Search attempt \(retryCount + 1) for '\(query)'")
         let searchRequest = MKLocalSearch.Request()
         searchRequest.naturalLanguageQuery = query
         searchRequest.region = MKCoordinateRegion(
             center: location.coordinate,
-            span: MKCoordinateSpan(latitudeDelta: 0.005, longitudeDelta: 0.005) // Increased search radius
+            span: MKCoordinateSpan(latitudeDelta: 0.005, longitudeDelta: 0.005)
         )
         
         let search = MKLocalSearch(request: searchRequest)
         
-        // Add timeout for search
-        let searchTimeout = DispatchTime.now() + 10.0 // Increased timeout
+        // Reduced timeout for faster response
+        let searchTimeout = DispatchTime.now() + 2.0 // Reduced from 10s to 2s
+        print("⏱️ Search timeout set to 2s")
         
         search.start { response, error in
             // Check timeout
@@ -461,34 +468,27 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
             
             guard let response = response, error == nil else {
                 print("⚠️ Parking search failed for query '\(query)': \(error?.localizedDescription ?? "Unknown error")")
-                
-                // Retry logic for network errors
-                if retryCount < 2 {
-                    print("🔄 Retrying parking search (attempt \(retryCount + 1))")
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                        self.performParkingSearchWithRetry(at: location, query: query, retryCount: retryCount + 1, completion: completion)
-                    }
-                    return
-                }
-                
                 completion(false, nil)
                 return
             }
             
+            print("🔍 Found \(response.mapItems.count) items for '\(query)'")
+            
             for item in response.mapItems {
                 let distance = location.distance(from: item.placemark.location ?? CLLocation())
-                if distance <= 150 { // Increased detection radius for underground garages
-                    let name = item.name ?? ""
-                    let keywords = ["garage", "parking", "structure", "deck", "ramp", "lot", "park", "underground", "basement"]
-                    let isGarage = keywords.contains { name.lowercased().contains($0) } ||
-                                   item.pointOfInterestCategory == .parking
-                    if isGarage {
-                        let formattedName = self.formatGarageName(for: item)
-                        completion(true, formattedName)
-                        return
-                    }
+                // STRICT: Only match if within 30m and name contains 'garage' or 'structure' and is .parking
+                let name = item.name?.lowercased() ?? ""
+                let isGarage = (distance <= 30) &&
+                    (name.contains("garage") || name.contains("structure")) &&
+                    (item.pointOfInterestCategory == .parking)
+                if isGarage {
+                    let formattedName = self.formatGarageName(for: item)
+                    print("✅ Found garage: \(formattedName) at distance \(distance)m")
+                    completion(true, formattedName)
+                    return
                 }
             }
+            print("❌ No suitable garage found for '\(query)'")
             completion(false, nil)
         }
     }
@@ -626,12 +626,19 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
         if let data = UserDefaults.standard.data(forKey: correctionsKey),
            let corrections = try? JSONDecoder().decode([String: [String: Int]].self, from: data) {
             floorCorrections = corrections
+            print("📱 Loaded floor corrections for \(floorCorrections.count) garages")
+        } else {
+            print("📱 No floor corrections found in storage")
         }
     }
     
     private func saveFloorCorrections() {
         if let data = try? JSONEncoder().encode(floorCorrections) {
             UserDefaults.standard.set(data, forKey: correctionsKey)
+            UserDefaults.standard.synchronize()
+            print("💾 Saved floor corrections: \(floorCorrections.count) garages")
+        } else {
+            print("❌ Failed to encode floor corrections")
         }
     }
     
@@ -639,12 +646,19 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
         if let data = UserDefaults.standard.data(forKey: issuesKey),
            let issues = try? JSONDecoder().decode([UserIssue].self, from: data) {
             userIssues = issues
+            print("📱 Loaded \(userIssues.count) user issues")
+        } else {
+            print("📱 No user issues found in storage")
         }
     }
     
     private func saveUserIssues() {
         if let data = try? JSONEncoder().encode(userIssues) {
             UserDefaults.standard.set(data, forKey: issuesKey)
+            UserDefaults.standard.synchronize()
+            print("💾 Saved \(userIssues.count) user issues")
+        } else {
+            print("❌ Failed to encode user issues")
         }
     }
     
@@ -698,6 +712,11 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     
     // Export correction data for analysis
     func exportCorrectionData() -> String {
+        print("📊 Starting data export...")
+        print("📊 Floor corrections: \(floorCorrections.count) garages")
+        print("📊 User issues: \(userIssues.count) issues")
+        print("📊 Altitude data: \(garageAltitudeData.count) garages")
+        
         var export = "CrossStreets Feedback Data Export\n"
         export += "Generated: \(Date())\n"
         export += "Device: \(UIDevice.current.name)\n\n"
@@ -759,6 +778,7 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
         export += "Total user issues reported: \(userIssues.count)\n"
         export += "Total garages with altitude data: \(garageAltitudeData.count)\n"
         
+        print("📊 Export completed: \(export.count) characters")
         return export
     }
     
@@ -779,7 +799,6 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
         
         // Get altitude with smart rounding
         let altitude = roundAltitude(location.altitude)
-        let accuracy = location.verticalAccuracy
         
         // Check if we have existing data for this garage
         if let garageData = garageAltitudeData[garageName] {
@@ -882,12 +901,31 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
         if let data = UserDefaults.standard.data(forKey: altitudeDataKey),
            let altitudeData = try? JSONDecoder().decode([String: GarageAltitudeData].self, from: data) {
             garageAltitudeData = altitudeData
+            print("📱 Loaded altitude data for \(garageAltitudeData.count) garages")
+        } else {
+            print("📱 No altitude data found in storage")
         }
     }
     
     private func saveAltitudeData() {
         if let data = try? JSONEncoder().encode(garageAltitudeData) {
             UserDefaults.standard.set(data, forKey: altitudeDataKey)
+            UserDefaults.standard.synchronize()
+            print("💾 Saved altitude data for \(garageAltitudeData.count) garages")
+        } else {
+            print("❌ Failed to encode altitude data")
         }
+    }
+    
+    // Debug method to test location manager functionality
+    func debugLocationStatus() {
+        print("🔍 DEBUG: Location Manager Status")
+        print("📍 Current Location: \(currentLocation?.coordinate.latitude ?? 0), \(currentLocation?.coordinate.longitude ?? 0)")
+        print("📍 Location Accuracy: \(currentLocation?.horizontalAccuracy ?? 0)m")
+        print("📍 Is Location Enabled: \(isLocationEnabled)")
+        print("📍 Authorization Status: \(authorizationStatus.rawValue)")
+        print("📍 Location Services Enabled: \(CLLocationManager.locationServicesEnabled())")
+        print("📍 Is Detecting Parking: \(isDetectingParking)")
+        print("📍 Parked Location: \(parkedLocation?.address ?? "None")")
     }
 }
