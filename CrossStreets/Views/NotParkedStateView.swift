@@ -2,7 +2,6 @@ import SwiftUI
 
 struct NotParkedStateView: View {
     @ObservedObject var locationManager: LocationManager
-    @Binding var isDetectingGarage: Bool
     @Binding var detectedGarageName: String?
     @Binding var showingFloorPicker: Bool
     
@@ -18,12 +17,11 @@ struct NotParkedStateView: View {
             }
             
             Button(action: {
-                isDetectingGarage = true
                 detectedGarageName = nil
                 locationManager.detectParkingType()
             }) {
                 HStack(spacing: 10) {
-                    if isDetectingGarage {
+                    if locationManager.isDetectingParking {
                         ProgressView()
                             .progressViewStyle(CircularProgressViewStyle(tint: .white))
                             .scaleEffect(0.9)
@@ -40,7 +38,7 @@ struct NotParkedStateView: View {
                 .background(Color.blue)
                 .cornerRadius(12)
             }
-            .disabled(isDetectingGarage)
+            .disabled(locationManager.isDetectingParking)
             .padding(.horizontal, 20)
         }
         .padding(.bottom, 10)
@@ -48,5 +46,5 @@ struct NotParkedStateView: View {
 }
 
 #Preview {
-    NotParkedStateView(locationManager: LocationManager(), isDetectingGarage: .constant(false), detectedGarageName: .constant(nil), showingFloorPicker: .constant(false))
+    NotParkedStateView(locationManager: LocationManager(), detectedGarageName: .constant(nil), showingFloorPicker: .constant(false))
 }

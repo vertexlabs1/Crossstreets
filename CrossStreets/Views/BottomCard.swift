@@ -4,7 +4,6 @@ struct BottomCard: View {
     @ObservedObject var locationManager: LocationManager
     @Binding var showingFloorPicker: Bool
     @Binding var detectedGarageName: String?
-    @Binding var isDetectingGarage: Bool
     
     var body: some View {
         VStack(spacing: 0) {
@@ -29,7 +28,6 @@ struct BottomCard: View {
                 } else {
                     NotParkedStateView(
                         locationManager: locationManager,
-                        isDetectingGarage: $isDetectingGarage,
                         detectedGarageName: $detectedGarageName,
                         showingFloorPicker: $showingFloorPicker
                     )
@@ -40,5 +38,5 @@ struct BottomCard: View {
 }
 
 #Preview {
-    BottomCard(locationManager: LocationManager(), showingFloorPicker: .constant(false), detectedGarageName: .constant(nil), isDetectingGarage: .constant(false))
+    BottomCard(locationManager: LocationManager(), showingFloorPicker: .constant(false), detectedGarageName: .constant(nil))
 }

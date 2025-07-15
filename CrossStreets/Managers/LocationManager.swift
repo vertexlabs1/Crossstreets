@@ -12,6 +12,7 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     @Published var authorizationStatus: CLAuthorizationStatus = .notDetermined
     @Published var isLocationEnabled = false
     @Published var locationPermissionError: String? = nil
+    @Published var isDetectingParking = false
     
     private var detectedGarageInfo: (Bool, String?)? = nil
     
@@ -270,15 +271,21 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
         }
     }
     
-    func detectParkingType() {
+    func detectParkingType(completion: @escaping () -> Void = {}) {
+        isDetectingParking = true
+        
         guard let location = currentLocation else { 
             print("⚠️ Cannot detect parking: No current location available")
+            isDetectingParking = false
+            completion()
             return 
         }
         
         // Validate location accuracy
         guard location.horizontalAccuracy <= 100 else {
             print("⚠️ Location accuracy too low: \(location.horizontalAccuracy)m")
+            isDetectingParking = false
+            completion()
             return
         }
         
@@ -289,6 +296,8 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
             // Fall back to basic parking detection without map search
             self.saveParkedLocation(floor: nil)
             self.detectedGarageInfo = (false, nil)
+            self.isDetectingParking = false
+            completion()
             return
         }
         
@@ -300,6 +309,8 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
                 // Check if we're still within timeout
                 guard DispatchTime.now() <= detectionTimeout else {
                     print("⚠️ Parking detection timed out")
+                    self?.isDetectingParking = false
+                    completion()
                     return
                 }
                 
@@ -310,6 +321,8 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
                     self?.saveParkedLocation(floor: nil)
                     self?.detectedGarageInfo = (false, nil)
                 }
+                self?.isDetectingParking = false
+                completion()
             }
         }
     }
@@ -504,6 +517,7 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
         let sharedDefaults = UserDefaults(suiteName: "group.com.tyler.crossstreets")
         sharedDefaults?.removeObject(forKey: "parkedLocation")
         detectedGarageInfo = nil
+        isDetectingParking = false
         HapticManager.lightImpact()
     }
     

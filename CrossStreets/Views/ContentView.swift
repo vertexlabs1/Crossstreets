@@ -6,7 +6,6 @@ struct ContentView: View {
     @State private var position: MapCameraPosition = .automatic
     @State private var showingFloorPicker = false
     @State private var detectedGarageName: String?
-    @State private var isDetectingGarage = false
     @State private var selectedTab = 0
     // --- New state for parking search ---
     @State private var parkingResults: [MKMapItem] = []
@@ -106,8 +105,7 @@ struct ContentView: View {
                         BottomCard(
                             locationManager: locationManager,
                             showingFloorPicker: $showingFloorPicker,
-                            detectedGarageName: $detectedGarageName,
-                            isDetectingGarage: $isDetectingGarage
+                            detectedGarageName: $detectedGarageName
                         )
                     }
                     Divider()
