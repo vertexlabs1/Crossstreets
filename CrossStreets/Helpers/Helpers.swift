@@ -1,19 +1,20 @@
 import UIKit
 
 class HapticManager {
+    private static let lightGenerator = UIImpactFeedbackGenerator(style: .light)
+    private static let mediumGenerator = UIImpactFeedbackGenerator(style: .medium)
+    private static let heavyGenerator = UIImpactFeedbackGenerator(style: .heavy)
+    
     static func lightImpact() {
-        let impact = UIImpactFeedbackGenerator(style: .light)
-        impact.impactOccurred()
+        lightGenerator.impactOccurred()
     }
     
     static func mediumImpact() {
-        let impact = UIImpactFeedbackGenerator(style: .medium)
-        impact.impactOccurred()
+        mediumGenerator.impactOccurred()
     }
     
     static func heavyImpact() {
-        let impact = UIImpactFeedbackGenerator(style: .heavy)
-        impact.impactOccurred()
+        heavyGenerator.impactOccurred()
     }
 }
 
