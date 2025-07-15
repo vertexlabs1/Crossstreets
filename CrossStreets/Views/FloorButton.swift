@@ -8,7 +8,10 @@ struct FloorButton: View {
     let action: () -> Void
     
     var body: some View {
-        Button(action: action) {
+        Button(action: {
+            HapticManager.lightImpact()
+            action()
+        }) {
             Text(floor)
                 .font(.system(size: isCompact ? 13 : 15, weight: .semibold))
                 .foregroundColor(isSelected ? .white : .black)

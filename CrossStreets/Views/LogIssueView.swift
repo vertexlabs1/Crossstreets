@@ -154,6 +154,7 @@ struct LogIssueView: View {
     private func submitIssue() {
         guard !notes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
         
+        HapticManager.mediumImpact()
         isSubmitting = true
         
         locationManager.logUserIssue(notes: notes.trimmingCharacters(in: .whitespacesAndNewlines), issueType: selectedIssueType)

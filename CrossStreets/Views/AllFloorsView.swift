@@ -23,6 +23,7 @@ struct AllFloorsView: View {
             .frame(maxHeight: 300)
             
             Button(action: {
+                HapticManager.lightImpact()
                 showingAllFloors = false
             }) {
                 HStack(spacing: 6) {

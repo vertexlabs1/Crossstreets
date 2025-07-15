@@ -139,7 +139,10 @@ struct ContentView: View {
                                 .font(.headline)
                                 .padding(.leading, 16)
                             Spacer()
-                            Button(action: { showParkingList = false }) {
+                            Button(action: { 
+                                HapticManager.lightImpact()
+                                showParkingList = false 
+                            }) {
                                 Image(systemName: "xmark.circle.fill")
                                     .font(.system(size: 22))
                                     .foregroundColor(.gray)
@@ -153,6 +156,7 @@ struct ContentView: View {
                                 ForEach(parkingResults, id: \ .self) { item in
                                     VStack(spacing: 0) {
                                         Button(action: {
+                                            HapticManager.lightImpact()
                                             if let coordinate = item.placemark.location?.coordinate {
                                                 withAnimation {
                                                     position = .region(MKCoordinateRegion(
@@ -314,6 +318,8 @@ struct ContentView: View {
     
     // --- Find Parking Nearby Logic ---
     private func findParkingNearby() {
+        HapticManager.lightImpact()
+        
         guard let userLocation = locationManager.currentLocation else { 
             errorMessage = "Unable to get your location. Please check your location settings."
             showErrorAlert = true
@@ -371,6 +377,7 @@ struct ContentView: View {
     
     // --- Navigation to Parking Logic ---
     private func navigateToParking(item: MKMapItem, coordinate: CLLocationCoordinate2D) {
+        HapticManager.lightImpact()
         // Create a map item for the parking location
         let mapItem = MKMapItem(placemark: MKPlacemark(coordinate: coordinate))
         mapItem.name = item.name ?? "Parking"

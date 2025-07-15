@@ -67,22 +67,23 @@ struct QuickFloorSelectionView: View {
             }
             
             Button(action: {
+                HapticManager.lightImpact()
                 showingAllFloors = true
             }) {
                 HStack(spacing: 6) {
-                    Image(systemName: "ellipsis.circle")
+                    Image(systemName: "ellipsis.circle.fill")
                         .font(.system(size: 16))
-                    Text("All floors")
-                        .font(.system(size: 15, weight: .medium))
+                    Text("Show All Floors")
+                        .font(.system(size: 14, weight: .medium))
                 }
                 .foregroundColor(.blue)
-                .padding(.vertical, 12)
-                .padding(.horizontal, 24)
+                .padding(.vertical, 8)
+                .padding(.horizontal, 16)
                 .background(
-                    RoundedRectangle(cornerRadius: 14)
+                    RoundedRectangle(cornerRadius: 10)
                         .fill(Color.white)
                         .overlay(
-                            RoundedRectangle(cornerRadius: 14)
+                            RoundedRectangle(cornerRadius: 10)
                                 .strokeBorder(Color.blue.opacity(0.3), lineWidth: 1.5)
                         )
                         .shadow(color: .black.opacity(0.08), radius: 4, y: 2)

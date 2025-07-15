@@ -95,6 +95,7 @@ struct ParkedStateView: View {
                 
                 HStack(spacing: 12) {
                     Button(action: {
+                        HapticManager.lightImpact()
                         locationManager.getDirectionsToParkedCar()
                     }) {
                         HStack {
@@ -111,6 +112,7 @@ struct ParkedStateView: View {
                     }
                     
                     Button(action: {
+                        HapticManager.mediumImpact()
                         Task { @MainActor in
                             withAnimation {
                                 locationManager.clearParkedLocation()

@@ -33,7 +33,10 @@ struct SettingsView: View {
                         }
                         
                         VStack(spacing: 8) {
-                            Button(action: { showingLogIssue = true }) {
+                            Button(action: { 
+                                HapticManager.lightImpact()
+                                showingLogIssue = true 
+                            }) {
                                 HStack {
                                     Image(systemName: "exclamationmark.triangle.fill")
                                         .font(.system(size: 16))
@@ -47,7 +50,10 @@ struct SettingsView: View {
                                 .cornerRadius(10)
                             }
                             
-                            Button(action: { showingExportSheet = true }) {
+                            Button(action: { 
+                                HapticManager.lightImpact()
+                                showingExportSheet = true 
+                            }) {
                                 HStack {
                                     Image(systemName: "square.and.arrow.up")
                                         .font(.system(size: 16))
@@ -281,6 +287,9 @@ struct SettingsView: View {
                                     .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(Color.black, lineWidth: 1))
                                 }
                                 .buttonStyle(PlainButtonStyle())
+                                .onTapGesture {
+                                    HapticManager.lightImpact()
+                                }
                             }
                             .padding(12)
                             .background(RoundedRectangle(cornerRadius: 8).fill(Color(.systemGray6)))

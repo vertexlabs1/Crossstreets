@@ -101,6 +101,7 @@ struct ExportDataView: View {
     }
     
     private func exportData() {
+        HapticManager.lightImpact()
         let exportData = locationManager.exportCorrectionData()
         
         // Create a temporary file
