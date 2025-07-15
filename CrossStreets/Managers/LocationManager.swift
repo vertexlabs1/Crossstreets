@@ -281,10 +281,13 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
             return 
         }
         
-        // Validate location accuracy
-        guard location.horizontalAccuracy <= 100 else {
+        // More lenient accuracy check for underground garages
+        guard location.horizontalAccuracy <= 200 else {
             print("⚠️ Location accuracy too low: \(location.horizontalAccuracy)m")
-            isDetectingParking = false
+            // Still try to save location even with poor accuracy for underground garages
+            self.saveParkedLocation(floor: nil)
+            self.detectedGarageInfo = (false, nil)
+            self.isDetectingParking = false
             completion()
             return
         }
@@ -302,13 +305,16 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
         }
         
         // Add timeout for parking detection
-        let detectionTimeout = DispatchTime.now() + 10.0 // 10 second timeout
+        let detectionTimeout = DispatchTime.now() + 15.0 // Increased to 15 second timeout
         
         checkForParkingGarage(at: location) { [weak self] isInGarage, garageName in
             DispatchQueue.main.async {
                 // Check if we're still within timeout
                 guard DispatchTime.now() <= detectionTimeout else {
                     print("⚠️ Parking detection timed out")
+                    // Save location even if garage detection fails
+                    self?.saveParkedLocation(floor: nil)
+                    self?.detectedGarageInfo = (false, nil)
                     self?.isDetectingParking = false
                     completion()
                     return
@@ -367,7 +373,14 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
                 completion(true, name)
             } else {
                 self.performParkingSearch(at: location, query: "parking") { found2, name2 in
-                    completion(found2, name2)
+                    if found2 {
+                        completion(true, name2)
+                    } else {
+                        // Try additional search terms for better garage detection
+                        self.performParkingSearch(at: location, query: "garage") { found3, name3 in
+                            completion(found3, name3)
+                        }
+                    }
                 }
             }
         }
@@ -382,13 +395,13 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
         searchRequest.naturalLanguageQuery = query
         searchRequest.region = MKCoordinateRegion(
             center: location.coordinate,
-            span: MKCoordinateSpan(latitudeDelta: 0.002, longitudeDelta: 0.002)
+            span: MKCoordinateSpan(latitudeDelta: 0.005, longitudeDelta: 0.005) // Increased search radius
         )
         
         let search = MKLocalSearch(request: searchRequest)
         
         // Add timeout for search
-        let searchTimeout = DispatchTime.now() + 8.0 // 8 second timeout
+        let searchTimeout = DispatchTime.now() + 10.0 // Increased timeout
         
         search.start { response, error in
             // Check timeout
@@ -416,9 +429,9 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
             
             for item in response.mapItems {
                 let distance = location.distance(from: item.placemark.location ?? CLLocation())
-                if distance <= 75 {
+                if distance <= 150 { // Increased detection radius for underground garages
                     let name = item.name ?? ""
-                    let keywords = ["garage", "parking", "structure", "deck", "ramp", "lot", "park"]
+                    let keywords = ["garage", "parking", "structure", "deck", "ramp", "lot", "park", "underground", "basement"]
                     let isGarage = keywords.contains { name.lowercased().contains($0) } ||
                                    item.pointOfInterestCategory == .parking
                     if isGarage {

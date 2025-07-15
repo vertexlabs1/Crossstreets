@@ -4,6 +4,7 @@ struct NotParkedStateView: View {
     @ObservedObject var locationManager: LocationManager
     @Binding var detectedGarageName: String?
     @Binding var showingFloorPicker: Bool
+    @State private var isButtonPressed = false
     
     var body: some View {
         VStack(spacing: 14) {
@@ -17,6 +18,15 @@ struct NotParkedStateView: View {
             }
             
             Button(action: {
+                // Add immediate visual feedback
+                isButtonPressed = true
+                HapticManager.lightImpact()
+                
+                // Reset button state after a short delay
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    isButtonPressed = false
+                }
+                
                 detectedGarageName = nil
                 locationManager.detectParkingType()
             }) {
@@ -35,11 +45,16 @@ struct NotParkedStateView: View {
                 .foregroundColor(.white)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 15)
-                .background(Color.blue)
-                .cornerRadius(12)
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(Color.blue)
+                        .scaleEffect(isButtonPressed ? 0.95 : 1.0)
+                        .animation(.easeInOut(duration: 0.1), value: isButtonPressed)
+                )
             }
             .disabled(locationManager.isDetectingParking)
             .padding(.horizontal, 20)
+            .buttonStyle(PlainButtonStyle())
         }
         .padding(.bottom, 10)
     }
