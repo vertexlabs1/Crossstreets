@@ -514,7 +514,7 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     func clearParkedLocation() {
         setParkedLocation(nil)
         UserDefaults.standard.removeObject(forKey: "parkedLocation")
-        let sharedDefaults = UserDefaults(suiteName: "group.crossstreets")
+        let sharedDefaults = UserDefaults(suiteName: "group.CC3YTPPQQJ.crossstreets")
         sharedDefaults?.removeObject(forKey: "parkedLocation")
         detectedGarageInfo = nil
         isDetectingParking = false
@@ -533,7 +533,7 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     private func saveToUserDefaults(_ location: ParkingLocation) {
         if let encoded = try? JSONEncoder().encode(location) {
             UserDefaults.standard.set(encoded, forKey: "parkedLocation")
-            let sharedDefaults = UserDefaults(suiteName: "group.crossstreets")
+            let sharedDefaults = UserDefaults(suiteName: "group.CC3YTPPQQJ.crossstreets")
             sharedDefaults?.set(encoded, forKey: "parkedLocation")
         }
     }

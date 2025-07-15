@@ -59,7 +59,7 @@ struct Provider: TimelineProvider {
 
     private func getEntry() -> SimpleEntry {
         do {
-            let sharedDefaults = UserDefaults(suiteName: "group.crossstreets")
+            let sharedDefaults = UserDefaults(suiteName: "group.CC3YTPPQQJ.crossstreets")
             guard let sharedDefaults = sharedDefaults else {
                 return SimpleEntry(date: Date(), address: nil, garageName: nil, floor: nil, timestamp: nil, isError: true, errorMessage: "Unable to access shared data")
             }
