@@ -17,6 +17,11 @@ struct ContentView: View {
     @State private var showSettingsSheet = false
     @State private var showHistorySheet = false
     // ---
+    // --- Error handling ---
+    @State private var showErrorAlert = false
+    @State private var errorMessage = ""
+    @Environment(\.isOnline) private var isOnline
+    // ---
     
     var body: some View {
         ZStack {
@@ -256,11 +261,33 @@ struct ContentView: View {
                 selectedTab = 0
             }
         }
+        .alert("Error", isPresented: $showErrorAlert) {
+            Button("OK") { }
+        } message: {
+            Text(errorMessage)
+        }
+        .onChange(of: isOnline) { online in
+            if !online {
+                errorMessage = "You're offline. Some features may not work properly."
+                showErrorAlert = true
+            }
+        }
     }
     
     // --- Find Parking Nearby Logic ---
     private func findParkingNearby() {
-        guard let userLocation = locationManager.currentLocation else { return }
+        guard let userLocation = locationManager.currentLocation else { 
+            errorMessage = "Unable to get your location. Please check your location settings."
+            showErrorAlert = true
+            return 
+        }
+        
+        if !isOnline {
+            errorMessage = "You're offline. Parking search requires an internet connection."
+            showErrorAlert = true
+            return
+        }
+        
         isSearchingParking = true
         let request = MKLocalSearch.Request()
         request.naturalLanguageQuery = "parking"
@@ -268,6 +295,12 @@ struct ContentView: View {
         let search = MKLocalSearch(request: request)
         search.start { response, error in
             isSearchingParking = false
+            if let error = error {
+                errorMessage = "Failed to find parking: \(error.localizedDescription)"
+                showErrorAlert = true
+                return
+            }
+            
             if let items = response?.mapItems {
                 // Sort by distance from user location
                 let sortedItems = items.sorted { item1, item2 in

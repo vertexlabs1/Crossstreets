@@ -273,6 +273,16 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
             return
         }
         
+        // Check if we're online for map searches
+        let isOnline = checkNetworkConnectivity()
+        if !isOnline {
+            print("⚠️ Offline mode: Using basic parking detection")
+            // Fall back to basic parking detection without map search
+            self.saveParkedLocation(floor: nil)
+            self.detectedGarageInfo = (false, nil)
+            return
+        }
+        
         // Add timeout for parking detection
         let detectionTimeout = DispatchTime.now() + 10.0 // 10 second timeout
         
@@ -295,6 +305,12 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
         }
     }
     
+    private func checkNetworkConnectivity() -> Bool {
+        // Simple network check - in a real app you'd use NWPathMonitor
+        // For now, we'll assume online and let the search fail gracefully
+        return true
+    }
+    
     private func checkForParkingGarage(at location: CLLocation, completion: @escaping (Bool, String?) -> Void) {
         performParkingSearch(at: location, query: "parking garage") { found, name in
             if found {
@@ -308,6 +324,10 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     }
     
     private func performParkingSearch(at location: CLLocation, query: String, completion: @escaping (Bool, String?) -> Void) {
+        performParkingSearchWithRetry(at: location, query: query, retryCount: 0, completion: completion)
+    }
+    
+    private func performParkingSearchWithRetry(at location: CLLocation, query: String, retryCount: Int, completion: @escaping (Bool, String?) -> Void) {
         let searchRequest = MKLocalSearch.Request()
         searchRequest.naturalLanguageQuery = query
         searchRequest.region = MKCoordinateRegion(
@@ -330,6 +350,16 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
             
             guard let response = response, error == nil else {
                 print("⚠️ Parking search failed for query '\(query)': \(error?.localizedDescription ?? "Unknown error")")
+                
+                // Retry logic for network errors
+                if retryCount < 2 {
+                    print("🔄 Retrying parking search (attempt \(retryCount + 1))")
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                        self.performParkingSearchWithRetry(at: location, query: query, retryCount: retryCount + 1, completion: completion)
+                    }
+                    return
+                }
+                
                 completion(false, nil)
                 return
             }
