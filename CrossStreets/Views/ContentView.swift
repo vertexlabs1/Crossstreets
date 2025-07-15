@@ -22,6 +22,13 @@ struct ContentView: View {
     @State private var errorMessage = ""
     @Environment(\.isOnline) private var isOnline
     // ---
+    // --- Deep link handling ---
+    @Binding var deepLinkDestination: String?
+    // ---
+    
+    init(deepLinkDestination: Binding<String?> = .constant(nil)) {
+        self._deepLinkDestination = deepLinkDestination
+    }
     
     var body: some View {
         ZStack {
@@ -271,6 +278,39 @@ struct ContentView: View {
                 errorMessage = "You're offline. Some features may not work properly."
                 showErrorAlert = true
             }
+        }
+        .onChange(of: deepLinkDestination) { destination in
+            if let destination = destination {
+                // Handle deep link
+                switch destination {
+                case "parking":
+                    // Widget tapped - ensure we're on the main parking view
+                    selectedTab = 0
+                    // Center on parked location if available
+                    if let parkedLocation = locationManager.parkedLocation {
+                        withAnimation(.easeInOut(duration: 0.8)) {
+                            position = .region(MKCoordinateRegion(
+                                center: parkedLocation.coordinate,
+                                span: MKCoordinateSpan(latitudeDelta: 0.005, longitudeDelta: 0.005)
+                            ))
+                        }
+                    }
+                default:
+                    break
+                }
+                // Clear the deep link destination
+                deepLinkDestination = nil
+            }
+        }
+        .alert("Location Error", isPresented: Binding<Bool>(
+            get: { locationManager.locationPermissionError != nil },
+            set: { newValue in
+                if !newValue { locationManager.locationPermissionError = nil }
+            })
+        ) {
+            Button("OK") { locationManager.locationPermissionError = nil }
+        } message: {
+            Text(locationManager.locationPermissionError ?? "")
         }
     }
     

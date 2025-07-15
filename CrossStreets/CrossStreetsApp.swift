@@ -6,6 +6,7 @@ struct CrossStreetsApp: App {
     @State private var showSplash = true
     @State private var isOnline = true
     @State private var showOfflineAlert = false
+    @State private var deepLinkDestination: String?
     
     // Network monitor
     private let networkMonitor = NWPathMonitor()
@@ -14,7 +15,7 @@ struct CrossStreetsApp: App {
     var body: some Scene {
         WindowGroup {
             ZStack {
-                ContentView()
+                ContentView(deepLinkDestination: $deepLinkDestination)
                     .opacity(showSplash ? 0 : 1)
                     .animation(.easeIn(duration: 0.5), value: showSplash)
                     .environment(\.isOnline, isOnline)
@@ -61,6 +62,19 @@ struct CrossStreetsApp: App {
             .onDisappear {
                 stopNetworkMonitoring()
             }
+            .onOpenURL { url in
+                handleDeepLink(url: url)
+            }
+        }
+    }
+    
+    private func handleDeepLink(url: URL) {
+        guard url.scheme == "crossstreets" else { return }
+        
+        // Handle widget deep link
+        if url.host == nil || url.host == "" {
+            // Widget tapped - show main parking view
+            deepLinkDestination = "parking"
         }
     }
     

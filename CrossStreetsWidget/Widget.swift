@@ -35,11 +35,13 @@ struct SimpleEntry: TimelineEntry {
     let garageName: String?
     let floor: String?
     let timestamp: Date?
+    let isError: Bool
+    let errorMessage: String?
 }
 
 struct Provider: TimelineProvider {
     func placeholder(in context: Context) -> SimpleEntry {
-        SimpleEntry(date: Date(), address: "123 Main St", garageName: "Downtown Garage", floor: "F2", timestamp: Date())
+        SimpleEntry(date: Date(), address: "123 Main St", garageName: "Downtown Garage", floor: "F2", timestamp: Date(), isError: false, errorMessage: nil)
     }
 
     func getSnapshot(in context: Context, completion: @escaping (SimpleEntry) -> Void) {
@@ -48,17 +50,42 @@ struct Provider: TimelineProvider {
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<SimpleEntry>) -> Void) {
         let entry = getEntry()
-        let timeline = Timeline(entries: [entry], policy: .atEnd)
+        
+        // Update timeline more frequently for better responsiveness
+        let nextUpdate = Calendar.current.date(byAdding: .minute, value: 5, to: Date()) ?? Date()
+        let timeline = Timeline(entries: [entry], policy: .after(nextUpdate))
         completion(timeline)
     }
 
     private func getEntry() -> SimpleEntry {
-        let sharedDefaults = UserDefaults(suiteName: "group.com.tyler.crossstreets")
-        if let data = sharedDefaults?.data(forKey: "parkedLocation"),
-           let location = try? JSONDecoder().decode(ParkingLocation.self, from: data) {
-            return SimpleEntry(date: Date(), address: location.address, garageName: location.garageName, floor: location.floor, timestamp: location.timestamp)
-        } else {
-            return SimpleEntry(date: Date(), address: nil, garageName: nil, floor: nil, timestamp: nil)
+        do {
+            let sharedDefaults = UserDefaults(suiteName: "group.com.tyler.crossstreets")
+            guard let sharedDefaults = sharedDefaults else {
+                return SimpleEntry(date: Date(), address: nil, garageName: nil, floor: nil, timestamp: nil, isError: true, errorMessage: "Unable to access shared data")
+            }
+            
+            guard let data = sharedDefaults.data(forKey: "parkedLocation") else {
+                return SimpleEntry(date: Date(), address: nil, garageName: nil, floor: nil, timestamp: nil, isError: false, errorMessage: nil)
+            }
+            
+            let location = try JSONDecoder().decode(ParkingLocation.self, from: data)
+            
+            // Validate the data
+            guard !location.address.isEmpty else {
+                return SimpleEntry(date: Date(), address: nil, garageName: nil, floor: nil, timestamp: nil, isError: true, errorMessage: "Invalid parking data")
+            }
+            
+            return SimpleEntry(
+                date: Date(), 
+                address: location.address, 
+                garageName: location.garageName, 
+                floor: location.floor, 
+                timestamp: location.timestamp,
+                isError: false,
+                errorMessage: nil
+            )
+        } catch {
+            return SimpleEntry(date: Date(), address: nil, garageName: nil, floor: nil, timestamp: nil, isError: true, errorMessage: "Data error")
         }
     }
 }
@@ -88,7 +115,17 @@ struct CrossStreetsWidgetEntryView: View {
                     Spacer()
                     
                     // Main content
-                    if let garage = entry.garageName, let floor = entry.floor {
+                    if entry.isError {
+                        // Error state
+                        VStack(spacing: 4) {
+                            Image(systemName: "exclamationmark.triangle")
+                                .font(.system(size: 24))
+                                .foregroundColor(.orange)
+                            Text("Tap to open app")
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundColor(.secondary)
+                        }
+                    } else if let garage = entry.garageName, let floor = entry.floor {
                         // Garage parking
                         VStack(spacing: 4) {
                             Text(garage)

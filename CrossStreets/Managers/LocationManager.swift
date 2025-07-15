@@ -11,6 +11,7 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     @Published var parkedLocation: ParkingLocation?
     @Published var authorizationStatus: CLAuthorizationStatus = .notDetermined
     @Published var isLocationEnabled = false
+    @Published var locationPermissionError: String? = nil
     
     private var detectedGarageInfo: (Bool, String?)? = nil
     
@@ -167,6 +168,7 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
         guard CLLocationManager.locationServicesEnabled() else {
             DispatchQueue.main.async {
                 self.showLocationServicesAlert()
+                self.locationPermissionError = "Location Services are disabled. Please enable them in Settings."
             }
             return
         }
@@ -178,11 +180,13 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
             locationManager.startUpdatingLocation()
             DispatchQueue.main.async {
                 self.isLocationEnabled = true
+                self.locationPermissionError = nil
             }
         case .denied, .restricted:
             DispatchQueue.main.async {
                 self.isLocationEnabled = false
                 self.showLocationPermissionAlert()
+                self.locationPermissionError = "Location permission denied. Please enable location access in Settings."
             }
         @unknown default:
             break
@@ -217,6 +221,7 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
         guard let location = locations.last else { return }
         DispatchQueue.main.async { [weak self] in
             self?.currentLocation = location
+            self?.optimizeLocationAccuracy()
         }
     }
     
@@ -229,6 +234,7 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
                 case .denied:
                     self.isLocationEnabled = false
                     self.showLocationPermissionAlert()
+                    self.locationPermissionError = "Location permission denied. Please enable location access in Settings."
                 case .locationUnknown:
                     // Temporary error, will retry
                     break
@@ -250,9 +256,12 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
             case .authorizedWhenInUse, .authorizedAlways:
                 self.isLocationEnabled = true
                 self.locationManager.startUpdatingLocation()
+                self.cleanupOldData() // Clean up old data when location is enabled
+                self.locationPermissionError = nil
             case .denied, .restricted:
                 self.isLocationEnabled = false
                 self.showLocationPermissionAlert()
+                self.locationPermissionError = "Location permission denied. Please enable location access in Settings."
             case .notDetermined:
                 self.isLocationEnabled = false
             @unknown default:
@@ -309,6 +318,34 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
         // Simple network check - in a real app you'd use NWPathMonitor
         // For now, we'll assume online and let the search fail gracefully
         return true
+    }
+    
+    // MARK: - Performance Optimizations
+    
+    private func optimizeLocationAccuracy() {
+        guard let location = currentLocation else { return }
+        
+        // Reduce location accuracy for better performance when not actively parking
+        if parkedLocation == nil {
+            locationManager.desiredAccuracy = kCLLocationAccuracyHundredMeters
+        } else {
+            locationManager.desiredAccuracy = kCLLocationAccuracyBest
+        }
+    }
+    
+    private func cleanupOldData() {
+        // Clean up old parking history (keep last 30 days)
+        let thirtyDaysAgo = Calendar.current.date(byAdding: .day, value: -30, to: Date()) ?? Date()
+        
+        if let history = UserDefaults.standard.array(forKey: "parkingHistory") as? [[String: Any]] {
+            let filteredHistory = history.filter { entry in
+                if let timestamp = entry["timestamp"] as? Date {
+                    return timestamp > thirtyDaysAgo
+                }
+                return true
+            }
+            UserDefaults.standard.set(filteredHistory, forKey: "parkingHistory")
+        }
     }
     
     private func checkForParkingGarage(at location: CLLocation, completion: @escaping (Bool, String?) -> Void) {

@@ -14,5 +14,16 @@
 	</array>
 	<key>CFBundleShortVersionString</key>
 	<string>1.0</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>com.tyler.crossstreets</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>crossstreets</string>
+			</array>
+		</dict>
+	</array>
 </dict>
 </plist>
