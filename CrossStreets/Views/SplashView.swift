@@ -42,6 +42,13 @@ struct SplashView: View {
                             .opacity(animateText ? 1 : 0)
                             .offset(y: animateText ? 0 : 15)
                         
+                        Text("BETA")
+                            .font(.system(size: 12, weight: .bold))
+                            .foregroundColor(.white.opacity(0.9))
+                            .tracking(1)
+                            .opacity(animateText ? 1 : 0)
+                            .offset(y: animateText ? 0 : 15)
+                        
                         Text("Never lose your car again")
                             .font(.system(size: 14, weight: .medium))
                             .foregroundColor(.white.opacity(0.8))

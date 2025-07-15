@@ -22,6 +22,48 @@ struct SettingsView: View {
                         .tracking(0.5)
                         .padding(.horizontal, 4)
                     
+                    // Feedback & Export Section - Moved to top
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack {
+                            Image(systemName: "message.fill")
+                                .font(.system(size: 14))
+                                .foregroundColor(.orange)
+                            Text("Feedback & Data")
+                                .font(.headline)
+                        }
+                        
+                        VStack(spacing: 8) {
+                            Button(action: { showingLogIssue = true }) {
+                                HStack {
+                                    Image(systemName: "exclamationmark.triangle.fill")
+                                        .font(.system(size: 16))
+                                    Text("Log an Issue or Update")
+                                        .font(.system(size: 16, weight: .semibold))
+                                }
+                                .foregroundColor(.white)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 12)
+                                .background(Color.orange)
+                                .cornerRadius(10)
+                            }
+                            
+                            Button(action: { showingExportSheet = true }) {
+                                HStack {
+                                    Image(systemName: "square.and.arrow.up")
+                                        .font(.system(size: 16))
+                                    Text("Export Feedback Data")
+                                        .font(.system(size: 16, weight: .semibold))
+                                }
+                                .foregroundColor(.white)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 12)
+                                .background(Color.blue)
+                                .cornerRadius(10)
+                            }
+                        }
+                    }
+                    .padding(.top, 8)
+                    
                     VStack(alignment: .leading, spacing: 12) {
                         Text("PARKING DETECTION")
                             .font(.system(size: 12, weight: .semibold))
@@ -77,48 +119,6 @@ struct SettingsView: View {
                             Text("\(stats.totalGarages) garages, \(stats.totalCorrections) corrections")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
-                        }
-                        .padding(.top, 12)
-                        
-                        // Feedback & Export Section
-                        VStack(alignment: .leading, spacing: 12) {
-                            HStack {
-                                Image(systemName: "message.fill")
-                                    .font(.system(size: 14))
-                                    .foregroundColor(.orange)
-                                Text("Feedback & Data")
-                                    .font(.headline)
-                            }
-                            
-                            VStack(spacing: 8) {
-                                Button(action: { showingLogIssue = true }) {
-                                    HStack {
-                                        Image(systemName: "exclamationmark.triangle.fill")
-                                            .font(.system(size: 16))
-                                        Text("Log an Issue or Update")
-                                            .font(.system(size: 16, weight: .semibold))
-                                    }
-                                    .foregroundColor(.white)
-                                    .frame(maxWidth: .infinity)
-                                    .padding(.vertical, 12)
-                                    .background(Color.orange)
-                                    .cornerRadius(10)
-                                }
-                                
-                                Button(action: { showingExportSheet = true }) {
-                                    HStack {
-                                        Image(systemName: "square.and.arrow.up")
-                                            .font(.system(size: 16))
-                                        Text("Export Feedback Data")
-                                            .font(.system(size: 16, weight: .semibold))
-                                    }
-                                    .foregroundColor(.white)
-                                    .frame(maxWidth: .infinity)
-                                    .padding(.vertical, 12)
-                                    .background(Color.blue)
-                                    .cornerRadius(10)
-                                }
-                            }
                         }
                         .padding(.top, 12)
                         
@@ -219,7 +219,7 @@ struct SettingsView: View {
                             
                             SettingsRow(
                                 icon: "iphone.circle.fill",
-                                title: "CrossStreets v1.0",
+                                title: "CrossStreets v1.0 Beta",
                                 subtitle: "Never lose your car again",
                                 iconColor: .blue
                             )
