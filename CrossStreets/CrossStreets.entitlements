@@ -4,7 +4,7 @@
 <dict>
 	<key>com.apple.security.application-groups</key>
 	<array>
-		<string>group.com.tyler.crossstreets</string>
+		<string>group.com.tamos.crossstreets</string>
 	</array>
 </dict>
 </plist>
