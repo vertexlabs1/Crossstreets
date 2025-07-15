@@ -10,16 +10,23 @@ struct FloorPickerView: View {
     
     let mainFloors = ["F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8", "F9", "F10", "RF"]
     let basementFloors = ["B3", "B2", "B1"]
+    let commonFloors = ["G", "F1", "F2", "F3", "B1", "B2", "RF"] // Most common floors first
     let allFloors: [String] = {
         var floors: [String] = []
-        for i in (4...10).reversed() {
+        
+        // Start with most common floors
+        floors.append(contentsOf: ["G", "F1", "F2", "F3", "B1", "B2", "RF"])
+        
+        // Add remaining basement floors
+        for i in (3...10).reversed() {
             floors.append("B\(i)")
         }
-        floors.append(contentsOf: ["B3", "B2", "B1", "G"])
-        for i in 1...50 {
+        
+        // Add remaining main floors
+        for i in 4...50 {
             floors.append("F\(i)")
         }
-        floors.append("RF") // Add Roof Floor
+        
         return floors
     }()
     

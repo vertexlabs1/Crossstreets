@@ -164,17 +164,49 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     }
     
     func requestLocationPermission() {
-        guard CLLocationManager.locationServicesEnabled() else { return }
+        guard CLLocationManager.locationServicesEnabled() else {
+            DispatchQueue.main.async {
+                self.showLocationServicesAlert()
+            }
+            return
+        }
+        
         switch locationManager.authorizationStatus {
         case .notDetermined:
             locationManager.requestWhenInUseAuthorization()
         case .authorizedWhenInUse, .authorizedAlways:
             locationManager.startUpdatingLocation()
+            DispatchQueue.main.async {
+                self.isLocationEnabled = true
+            }
         case .denied, .restricted:
-            print("Location permission denied")
+            DispatchQueue.main.async {
+                self.isLocationEnabled = false
+                self.showLocationPermissionAlert()
+            }
         @unknown default:
             break
         }
+    }
+    
+    private func showLocationServicesAlert() {
+        let content = UNMutableNotificationContent()
+        content.title = "Location Services Disabled"
+        content.body = "Please enable Location Services in Settings to use CrossStreets."
+        content.sound = .default
+        
+        let request = UNNotificationRequest(identifier: "locationServices", content: content, trigger: nil)
+        UNUserNotificationCenter.current().add(request, withCompletionHandler: nil)
+    }
+    
+    private func showLocationPermissionAlert() {
+        let content = UNMutableNotificationContent()
+        content.title = "Location Permission Required"
+        content.body = "CrossStreets needs location access to help you find your parked car. Please enable in Settings."
+        content.sound = .default
+        
+        let request = UNNotificationRequest(identifier: "locationPermission", content: content, trigger: nil)
+        UNUserNotificationCenter.current().add(request, withCompletionHandler: nil)
     }
     
     func requestLocation() {
@@ -190,23 +222,68 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     
     func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
         print("Location manager failed with error: \(error.localizedDescription)")
+        
+        DispatchQueue.main.async {
+            if let clError = error as? CLError {
+                switch clError.code {
+                case .denied:
+                    self.isLocationEnabled = false
+                    self.showLocationPermissionAlert()
+                case .locationUnknown:
+                    // Temporary error, will retry
+                    break
+                case .network:
+                    // Network error, will retry
+                    break
+                default:
+                    self.isLocationEnabled = false
+                }
+            } else {
+                self.isLocationEnabled = false
+            }
+        }
     }
     
     func locationManager(_ manager: CLLocationManager, didChangeAuthorization status: CLAuthorizationStatus) {
-        switch status {
-        case .authorizedWhenInUse, .authorizedAlways:
-            locationManager.startUpdatingLocation()
-        case .denied, .restricted:
-            print("Location permission denied/restricted")
-        default:
-            break
+        DispatchQueue.main.async {
+            switch status {
+            case .authorizedWhenInUse, .authorizedAlways:
+                self.isLocationEnabled = true
+                self.locationManager.startUpdatingLocation()
+            case .denied, .restricted:
+                self.isLocationEnabled = false
+                self.showLocationPermissionAlert()
+            case .notDetermined:
+                self.isLocationEnabled = false
+            @unknown default:
+                self.isLocationEnabled = false
+            }
         }
     }
     
     func detectParkingType() {
-        guard let location = currentLocation else { return }
+        guard let location = currentLocation else { 
+            print("⚠️ Cannot detect parking: No current location available")
+            return 
+        }
+        
+        // Validate location accuracy
+        guard location.horizontalAccuracy <= 100 else {
+            print("⚠️ Location accuracy too low: \(location.horizontalAccuracy)m")
+            return
+        }
+        
+        // Add timeout for parking detection
+        let detectionTimeout = DispatchTime.now() + 10.0 // 10 second timeout
+        
         checkForParkingGarage(at: location) { [weak self] isInGarage, garageName in
             DispatchQueue.main.async {
+                // Check if we're still within timeout
+                guard DispatchTime.now() <= detectionTimeout else {
+                    print("⚠️ Parking detection timed out")
+                    return
+                }
+                
                 if isInGarage {
                     self?.detectedGarageInfo = (true, garageName)
                     self?.sendGarageFloorNotification(garageName: garageName)
@@ -237,12 +314,26 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
             center: location.coordinate,
             span: MKCoordinateSpan(latitudeDelta: 0.002, longitudeDelta: 0.002)
         )
+        
         let search = MKLocalSearch(request: searchRequest)
+        
+        // Add timeout for search
+        let searchTimeout = DispatchTime.now() + 8.0 // 8 second timeout
+        
         search.start { response, error in
-            guard let response = response, error == nil else {
+            // Check timeout
+            guard DispatchTime.now() <= searchTimeout else {
+                print("⚠️ Parking search timed out for query: \(query)")
                 completion(false, nil)
                 return
             }
+            
+            guard let response = response, error == nil else {
+                print("⚠️ Parking search failed for query '\(query)': \(error?.localizedDescription ?? "Unknown error")")
+                completion(false, nil)
+                return
+            }
+            
             for item in response.mapItems {
                 let distance = location.distance(from: item.placemark.location ?? CLLocation())
                 if distance <= 75 {

@@ -8,28 +8,20 @@ struct QuickFloorSelectionView: View {
     let saveAction: () -> Void
     let estimatedFloor: String?
     
+    // Common floors that users select most often
+    let commonFloors = ["G", "F1", "F2", "F3", "B1", "B2", "RF"]
+    
     var body: some View {
         VStack(spacing: 20) {
-            VStack(spacing: 8) {
-                Text("GROUND")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundColor(.black.opacity(0.6))
-                    .tracking(0.5)
-                
-                FloorButton(floor: "G", isSelected: selectedFloor == "G", isEstimated: estimatedFloor == "G") {
-                    selectedFloor = "G"
-                    saveAction()
-                }
-            }
-            
+            // Common floors section
             VStack(spacing: 10) {
-                Text("FLOORS")
+                Text("COMMON FLOORS")
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundColor(.black.opacity(0.6))
                     .tracking(0.5)
                 
-                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 5), spacing: 10) {
-                    ForEach(mainFloors, id: \.self) { floor in
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 4), spacing: 8) {
+                    ForEach(commonFloors, id: \.self) { floor in
                         FloorButton(floor: floor, isSelected: selectedFloor == floor, isEstimated: estimatedFloor == floor) {
                             selectedFloor = floor
                             saveAction()
@@ -38,17 +30,37 @@ struct QuickFloorSelectionView: View {
                 }
             }
             
+            // Other floors section
             VStack(spacing: 10) {
-                Text("BASEMENT")
+                Text("OTHER FLOORS")
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundColor(.black.opacity(0.6))
                     .tracking(0.5)
                 
-                HStack(spacing: 10) {
-                    ForEach(basementFloors, id: \.self) { floor in
+                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: 5), spacing: 10) {
+                    ForEach(mainFloors.filter { !commonFloors.contains($0) }, id: \.self) { floor in
                         FloorButton(floor: floor, isSelected: selectedFloor == floor, isEstimated: estimatedFloor == floor) {
                             selectedFloor = floor
                             saveAction()
+                        }
+                    }
+                }
+            }
+            
+            // Basement section
+            if !basementFloors.filter({ !commonFloors.contains($0) }).isEmpty {
+                VStack(spacing: 10) {
+                    Text("BASEMENT")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(.black.opacity(0.6))
+                        .tracking(0.5)
+                    
+                    HStack(spacing: 10) {
+                        ForEach(basementFloors.filter { !commonFloors.contains($0) }, id: \.self) { floor in
+                            FloorButton(floor: floor, isSelected: selectedFloor == floor, isEstimated: estimatedFloor == floor) {
+                                selectedFloor = floor
+                                saveAction()
+                            }
                         }
                     }
                 }
@@ -60,7 +72,7 @@ struct QuickFloorSelectionView: View {
                 HStack(spacing: 6) {
                     Image(systemName: "ellipsis.circle")
                         .font(.system(size: 16))
-                    Text("More floors")
+                    Text("All floors")
                         .font(.system(size: 15, weight: .medium))
                 }
                 .foregroundColor(.blue)
