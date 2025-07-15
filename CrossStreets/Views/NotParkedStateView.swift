@@ -44,15 +44,6 @@ struct NotParkedStateView: View {
             .padding(.horizontal, 20)
         }
         .padding(.bottom, 10)
-        .onReceive(locationManager.$detectedGarageInfo) { garageInfo in
-            if let (isInGarage, garageName) = garageInfo {
-                isDetectingGarage = false
-                if isInGarage {
-                    detectedGarageName = garageName
-                    showingFloorPicker = true
-                }
-            }
-        }
     }
 }
 

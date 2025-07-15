@@ -3,6 +3,8 @@ import SwiftUI
 struct SettingsView: View {
     @ObservedObject var locationManager: LocationManager
     @Binding var selectedTab: Int
+    @State private var showingLogIssue = false
+    @State private var showingExportSheet = false
     
     var body: some View {
         VStack(spacing: 0) {
@@ -49,43 +51,97 @@ struct SettingsView: View {
                             )
                         }
                         
-                        Button(action: locationManager.enableTestMode) {
-                            HStack {
-                                Image(systemName: "testtube.2")
-                                    .font(.system(size: 16))
-                                Text("Test Garage Detection")
-                                    .font(.system(size: 16, weight: .semibold))
-                            }
-                            .foregroundColor(.white)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 12)
-                            .background(Color.purple)
-                            .cornerRadius(10)
-                        }
-                        .padding(.top, 8)
-                        
-                        if locationManager.testModeEnabled {
-                            HStack {
-                                Image(systemName: "checkmark.circle.fill")
-                                    .foregroundColor(.green)
-                                Text("Test mode enabled - Park Here will simulate garage detection")
-                                    .font(.system(size: 13))
-                                    .foregroundColor(.green)
-                            }
-                            .padding(.top, 4)
-                        }
-                        
                         VStack(alignment: .leading, spacing: 8) {
                             HStack {
                                 Image(systemName: "externaldrive.fill")
                                     .font(.system(size: 14))
                                     .foregroundColor(.blue)
-                                Text("Offline Cache: \(locationManager.cacheCount) locations saved")
+                                Text("Offline Storage: Address caching enabled")
                                     .font(.system(size: 13))
                                     .foregroundColor(.secondary)
                             }
                         }
                         .padding(.top, 12)
+                        
+                        // Garage Floor Correction Data
+                        VStack(alignment: .leading, spacing: 12) {
+                            HStack {
+                                Image(systemName: "building.2.fill")
+                                    .font(.system(size: 14))
+                                    .foregroundColor(.green)
+                                Text("Garage Floor Data")
+                                    .font(.headline)
+                            }
+                            
+                            let stats = locationManager.getCorrectionStats()
+                            Text("\(stats.totalGarages) garages, \(stats.totalCorrections) corrections")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        .padding(.top, 12)
+                        
+                        // Feedback & Export Section
+                        VStack(alignment: .leading, spacing: 12) {
+                            HStack {
+                                Image(systemName: "message.fill")
+                                    .font(.system(size: 14))
+                                    .foregroundColor(.orange)
+                                Text("Feedback & Data")
+                                    .font(.headline)
+                            }
+                            
+                            VStack(spacing: 8) {
+                                Button(action: { showingLogIssue = true }) {
+                                    HStack {
+                                        Image(systemName: "exclamationmark.triangle.fill")
+                                            .font(.system(size: 16))
+                                        Text("Log an Issue or Update")
+                                            .font(.system(size: 16, weight: .semibold))
+                                    }
+                                    .foregroundColor(.white)
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 12)
+                                    .background(Color.orange)
+                                    .cornerRadius(10)
+                                }
+                                
+                                Button(action: { showingExportSheet = true }) {
+                                    HStack {
+                                        Image(systemName: "square.and.arrow.up")
+                                            .font(.system(size: 16))
+                                        Text("Export Feedback Data")
+                                            .font(.system(size: 16, weight: .semibold))
+                                    }
+                                    .foregroundColor(.white)
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 12)
+                                    .background(Color.blue)
+                                    .cornerRadius(10)
+                                }
+                            }
+                        }
+                        .padding(.top, 12)
+                        
+                        Button(action: {
+                            let exportData = locationManager.exportCorrectionData()
+                            // For now, just print to console - you can add sharing later
+                            print("=== GARAGE FLOOR CORRECTION DATA ===")
+                            print(exportData)
+                            print("=====================================")
+                        }) {
+                            HStack {
+                                Image(systemName: "square.and.arrow.up")
+                                    .font(.system(size: 14))
+                                Text("Export Correction Data")
+                                    .font(.system(size: 14, weight: .medium))
+                            }
+                            .foregroundColor(.orange)
+                            .padding(.vertical, 8)
+                            .padding(.horizontal, 12)
+                            .background(Color.orange.opacity(0.1))
+                            .cornerRadius(8)
+                        }
+                        .padding(.top, 16)
                     }
                     
                     VStack(alignment: .leading, spacing: 12) {
@@ -250,6 +306,14 @@ struct SettingsView: View {
                 .padding(.horizontal, 20)
                 .padding(.bottom, 20)
             }
+        }
+        .navigationTitle("Settings")
+        .navigationBarTitleDisplayMode(.large)
+        .sheet(isPresented: $showingLogIssue) {
+            LogIssueView(locationManager: locationManager)
+        }
+        .sheet(isPresented: $showingExportSheet) {
+            ExportDataView(locationManager: locationManager)
         }
     }
     

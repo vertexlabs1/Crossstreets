@@ -7,9 +7,6 @@ struct FloorPickerView: View {
     
     @State private var selectedFloor: String?
     @State private var showingAllFloors = false
-    @State private var estimatedFloor: String? = nil
-    @AppStorage("averageFloorHeight") private var averageFloorHeight: Double = 3.5
-    @State private var showSetBaselineAlert = false
     
     let mainFloors = ["F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8", "F9", "F10", "RF"]
     let basementFloors = ["B3", "B2", "B1"]
@@ -50,47 +47,6 @@ struct FloorPickerView: View {
                             .lineLimit(2)
                             .multilineTextAlignment(.center)
                             .padding(.horizontal, 10)
-                        
-                        if let estimate = estimatedFloor {
-                            Text("You’re likely on \(estimate)")
-                                .font(.system(size: 16, weight: .medium))
-                                .foregroundColor(.blue)
-                        } else {
-                            Text("Estimating floor...")
-                                .font(.system(size: 14))
-                                .foregroundColor(.gray)
-                        }
-                        // --- Controls for baseline and floor height ---
-                        HStack(spacing: 12) {
-                            Button(action: { showSetBaselineAlert = true }) {
-                                Label("Set Ground Floor", systemImage: "arrow.down.to.line")
-                                    .font(.system(size: 13, weight: .medium))
-                            }
-                            .alert(isPresented: $showSetBaselineAlert) {
-                                Alert(
-                                    title: Text("Set Ground Floor Baseline?"),
-                                    message: Text("This will use your current altitude as the ground floor for this garage."),
-                                    primaryButton: .default(Text("Set")) {
-                                        locationManager.setGroundFloorBaseline()
-                                        locationManager.estimateFloor { floor in
-                                            estimatedFloor = floor
-                                        }
-                                    },
-                                    secondaryButton: .cancel()
-                                )
-                            }
-                            HStack(spacing: 4) {
-                                Text("Floor Height:")
-                                    .font(.system(size: 13))
-                                Stepper(value: $averageFloorHeight, in: 2.0...6.0, step: 0.1) {
-                                    Text("\(averageFloorHeight, specifier: "%.1f")m")
-                                        .font(.system(size: 13, weight: .medium))
-                                }
-                                .frame(width: 120)
-                            }
-                        }
-                        .padding(.top, 2)
-                        // ---
                     }
                     .padding(.top, 8)
                     
@@ -101,7 +57,7 @@ struct FloorPickerView: View {
                             basementFloors: basementFloors,
                             showingAllFloors: $showingAllFloors,
                             saveAction: saveAndClose,
-                            estimatedFloor: estimatedFloor
+                            estimatedFloor: nil
                         )
                     } else {
                         AllFloorsView(
@@ -109,7 +65,7 @@ struct FloorPickerView: View {
                             allFloors: allFloors,
                             showingAllFloors: $showingAllFloors,
                             saveAction: saveAndClose,
-                            estimatedFloor: estimatedFloor
+                            estimatedFloor: nil
                         )
                     }
                     
@@ -158,11 +114,6 @@ struct FloorPickerView: View {
                         .fill(Color.white)
                         .shadow(color: .black.opacity(0.25), radius: 40, y: -15)
                 )
-                .onAppear {
-                    locationManager.estimateFloor { floor in
-                        estimatedFloor = floor
-                    }
-                }
             }
         }
     }
@@ -172,8 +123,26 @@ struct FloorPickerView: View {
         
         HapticManager.lightImpact()
         locationManager.saveParkedLocation(floor: floor)
-        locationManager.saveUserFloorCorrection(selected: floor, estimated: estimatedFloor)
         showingFloorPicker = false
+    }
+    
+    private func selectFloor(_ floor: String) {
+        selectedFloor = floor
+        showingFloorPicker = false
+        
+        // Record the correction for data collection
+        if let garageName = locationManager.parkedLocation?.garageName {
+            locationManager.recordFloorCorrection(garageName: garageName, floor: floor)
+        }
+        
+        // Update the parked location with the selected floor
+        if var updatedLocation = locationManager.parkedLocation {
+            updatedLocation.floor = floor
+            locationManager.parkedLocation = updatedLocation
+            locationManager.saveParkedLocation(floor: floor)
+        }
+        
+        HapticManager.mediumImpact()
     }
 }
 

@@ -1,7 +1,6 @@
 import WidgetKit
 import SwiftUI
 import CoreLocation
-import MapKit
 
 struct ParkingLocation: Codable {
     let id: UUID
@@ -35,13 +34,12 @@ struct SimpleEntry: TimelineEntry {
     let address: String?
     let garageName: String?
     let floor: String?
-    let coordinate: CLLocationCoordinate2D?
     let timestamp: Date?
 }
 
 struct Provider: TimelineProvider {
     func placeholder(in context: Context) -> SimpleEntry {
-        SimpleEntry(date: Date(), address: "123 Main St", garageName: "Downtown Garage", floor: "F2", coordinate: CLLocationCoordinate2D(latitude: 37.7749, longitude: -122.4194), timestamp: Date())
+        SimpleEntry(date: Date(), address: "123 Main St", garageName: "Downtown Garage", floor: "F2", timestamp: Date())
     }
 
     func getSnapshot(in context: Context, completion: @escaping (SimpleEntry) -> Void) {
@@ -58,9 +56,9 @@ struct Provider: TimelineProvider {
         let sharedDefaults = UserDefaults(suiteName: "group.com.tyler.crossstreets")
         if let data = sharedDefaults?.data(forKey: "parkedLocation"),
            let location = try? JSONDecoder().decode(ParkingLocation.self, from: data) {
-            return SimpleEntry(date: Date(), address: location.address, garageName: location.garageName, floor: location.floor, coordinate: location.coordinate, timestamp: location.timestamp)
+            return SimpleEntry(date: Date(), address: location.address, garageName: location.garageName, floor: location.floor, timestamp: location.timestamp)
         } else {
-            return SimpleEntry(date: Date(), address: nil, garageName: nil, floor: nil, coordinate: nil, timestamp: nil)
+            return SimpleEntry(date: Date(), address: nil, garageName: nil, floor: nil, timestamp: nil)
         }
     }
 }
@@ -74,73 +72,67 @@ struct CrossStreetsWidgetEntryView: View {
             ZStack {
                 RoundedRectangle(cornerRadius: 20)
                     .fill(LinearGradient(gradient: Gradient(colors: [Color.blue.opacity(0.18), Color(.systemBackground)]), startPoint: .top, endPoint: .bottom))
-                VStack(spacing: 10) {
-                    if let coordinate = entry.coordinate {
-                        // --- Map snapshot (mocked with static image for now) ---
-                        AsyncImage(url: mapSnapshotURL(for: coordinate)) { image in
-                            image.resizable().aspectRatio(contentMode: .fill)
-                        } placeholder: {
-                            Color(.systemGray5)
-                        }
-                        .frame(height: family == .systemSmall ? 80 : 120)
-                        .clipShape(RoundedRectangle(cornerRadius: 14))
-                        .overlay(
-                            Image(systemName: "mappin.circle.fill")
-                                .font(.system(size: 32))
-                                .foregroundColor(.red)
-                                .offset(y: -10)
-                        , alignment: .center)
-                    }
-                    // ---
-                    if let garage = entry.garageName, let floor = entry.floor {
-                        let displayFloor = (floor == "RF") ? "Roof" : floor
-                        Text(garage)
-                            .font(.headline)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.7)
-                        Text("Floor \(displayFloor)")
-                            .font(.subheadline)
+                
+                VStack(spacing: 8) {
+                    // Header with car icon
+                    HStack {
+                        Image(systemName: "car.circle.fill")
+                            .font(.system(size: 20))
                             .foregroundColor(.blue)
-                        if let t = entry.timestamp {
-                            Text(timeAgo(since: t))
-                                .font(.caption)
-                                .foregroundColor(.secondary)
+                        Text("CrossStreets")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundColor(.primary)
+                        Spacer()
+                    }
+                    
+                    Spacer()
+                    
+                    // Main content
+                    if let garage = entry.garageName, let floor = entry.floor {
+                        // Garage parking
+                        VStack(spacing: 4) {
+                            Text(garage)
+                                .font(.system(size: family == .systemSmall ? 14 : 16, weight: .semibold))
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.8)
+                            
+                            let displayFloor = (floor == "RF") ? "Roof" : floor
+                            Text("Floor \(displayFloor)")
+                                .font(.system(size: family == .systemSmall ? 12 : 14))
+                                .foregroundColor(.blue)
                         }
                     } else if let address = entry.address {
+                        // Street parking
                         Text(address)
-                            .font(.headline)
+                            .font(.system(size: family == .systemSmall ? 12 : 14, weight: .medium))
                             .lineLimit(2)
                             .minimumScaleFactor(0.7)
-                        if let t = entry.timestamp {
-                            Text(timeAgo(since: t))
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
+                            .multilineTextAlignment(.center)
                     } else {
-                        VStack(spacing: 8) {
+                        // No parking
+                        VStack(spacing: 4) {
                             Image(systemName: "car.circle")
-                                .font(.system(size: 32))
+                                .font(.system(size: 24))
                                 .foregroundColor(.gray)
                             Text("No car parked")
-                                .font(.headline)
+                                .font(.system(size: 12, weight: .medium))
                                 .foregroundColor(.secondary)
                         }
                     }
+                    
+                    Spacer()
+                    
+                    // Time info
+                    if let timestamp = entry.timestamp {
+                        Text(timeAgo(since: timestamp))
+                            .font(.system(size: 10))
+                            .foregroundColor(.secondary)
+                    }
                 }
-                .padding()
+                .padding(12)
             }
             .containerBackground(Color.clear, for: .widget)
         }
-    }
-
-    // Mocked static map snapshot URL (replace with real snapshotter for production)
-    func mapSnapshotURL(for coordinate: CLLocationCoordinate2D) -> URL? {
-        // For demo: use a static map image from Mapbox Static API or similar
-        // Replace with your own API key or snapshot logic
-        let lat = coordinate.latitude
-        let lon = coordinate.longitude
-        let urlString = "https://api.mapbox.com/styles/v1/mapbox/streets-v11/static/pin-s-car+285A98(\(lon),\(lat))/\(lon),\(lat),16,0/400x200?access_token=pk.eyJ1IjoibWFwYm94dXNlciIsImEiOiJja2xqZ2Z2b3YwM2JwMnBvN2Z6b2J6b2JzIn0.2v9wQw1Qw1Qw1Qw1Qw1Qw1Q"
-        return URL(string: urlString)
     }
 
     func timeAgo(since date: Date) -> String {
@@ -159,7 +151,7 @@ struct CrossStreetsWidget: Widget {
             CrossStreetsWidgetEntryView(entry: entry)
         }
         .configurationDisplayName("CrossStreets")
-        .description("Shows your parking info.")
+        .description("Shows your parking location and time.")
         .supportedFamilies([.systemSmall, .systemMedium])
     }
 }

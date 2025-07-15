@@ -7,44 +7,34 @@ import SwiftUI // Added for @AppStorage
 
 class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     private let locationManager = CLLocationManager()
-    private var isSearchingForGarage = false
-    
     @Published var currentLocation: CLLocation?
     @Published var parkedLocation: ParkingLocation?
-    @Published var detectedGarageInfo: (Bool, String?)?
+    @Published var authorizationStatus: CLAuthorizationStatus = .notDetermined
+    @Published var isLocationEnabled = false
     
-    @Published var testModeEnabled: Bool = false
+    private var detectedGarageInfo: (Bool, String?)? = nil
     
-    private var addressCache: [String: String] = [:]
-    private let addressCacheKey = "cachedAddresses"
+    // Local storage for garage floor corrections
+    private let correctionsKey = "garageFloorCorrections"
+    private let issuesKey = "userReportedIssues"
+    private var floorCorrections: [String: [String: Int]] = [:] // [garageName: [floor: count]]
+    private var userIssues: [UserIssue] = []
     
-    var cacheCount: Int {
-        return addressCache.count
+    struct UserIssue: Codable {
+        let id: UUID
+        let timestamp: Date
+        let location: CLLocationCoordinate2D
+        let address: String
+        let notes: String
+        let issueType: String // "floor_correction", "general_issue", "feature_request", etc.
     }
-    
-    // Altitude estimation
-    private var altitudeReadings: [Double] = []
-    @AppStorage("averageFloorHeight") private var averageFloorHeight: Double = 3.5
-    private var baselineAltitude: Double?
-    private var userFloorCorrections: [String: Double] = [:] // garageName: adjustment
-    private let correctionsKey = "floorCorrections"
-    
-    private var floorAltitudes: [String: [String: Double]] = [:] // garageName: [floor: altitude]
-    private let floorAltitudesKey = "floorAltitudes"
-    
-    // --- Auto-park detection state ---
-    private var stationaryStartTime: Date?
-    private var lastSpeed: CLLocationSpeed = -1
-    private var autoParkTimer: Timer?
-    // ---
     
     override init() {
         super.init()
         setupLocationManager()
         loadParkedLocation()
-        loadAddressCache()
         loadFloorCorrections()
-        loadFloorAltitudes()
+        loadUserIssues()
     }
     
     private func setupLocationManager() {
@@ -53,197 +43,29 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
         locationManager.distanceFilter = 25
     }
     
-    private func loadFloorCorrections() {
-        if let data = UserDefaults.standard.data(forKey: correctionsKey),
-           let decoded = try? JSONDecoder().decode([String: Double].self, from: data) {
-            userFloorCorrections = decoded
-        }
-    }
-    
-    private func saveFloorCorrections() {
-        if let encoded = try? JSONEncoder().encode(userFloorCorrections) {
-            UserDefaults.standard.set(encoded, forKey: correctionsKey)
-        }
-    }
-    
-    private func loadFloorAltitudes() {
-        if let data = UserDefaults.standard.data(forKey: floorAltitudesKey),
-           let decoded = try? JSONDecoder().decode([String: [String: Double]].self, from: data) {
-            floorAltitudes = decoded
-        }
-    }
-    
-    private func saveFloorAltitudes() {
-        if let encoded = try? JSONEncoder().encode(floorAltitudes) {
-            UserDefaults.standard.set(encoded, forKey: floorAltitudesKey)
-        }
-    }
-    
-    func setGroundFloorBaseline() {
-        guard let currentAltitude = currentLocation?.altitude else { return }
-        let garage = detectedGarageInfo?.1 ?? "default"
-        UserDefaults.standard.set(currentAltitude, forKey: "baseline_\(garage)")
-        baselineAltitude = currentAltitude
-    }
-    
-    func estimateFloor(completion: @escaping (String?) -> Void) {
-        guard let currentAltitude = currentLocation?.altitude else {
-            completion(nil)
-            return
-        }
-        let garage = detectedGarageInfo?.1 ?? "default"
-        // --- Use per-floor mapping if available ---
-        if let floorMap = floorAltitudes[garage] {
-            // Find the closest mapped floor by altitude
-            let sorted = floorMap.sorted { abs($0.value - currentAltitude) < abs($1.value - currentAltitude) }
-            if let (floor, mappedAltitude) = sorted.first, abs(mappedAltitude - currentAltitude) < averageFloorHeight / 2 {
-                completion(floor)
-                return
-            }
-        }
-        // ---
-        if let storedBaseline = UserDefaults.standard.value(forKey: "baseline_\(garage)") as? Double {
-            baselineAltitude = storedBaseline
-        } else if baselineAltitude == nil {
-            baselineAltitude = currentAltitude
-        }
-        let correction = userFloorCorrections[garage] ?? 0
-        altitudeReadings.append(currentAltitude)
-        if altitudeReadings.count > 5 {
-            altitudeReadings.removeFirst()
-        }
-        let averageAltitude = altitudeReadings.reduce(0, +) / Double(altitudeReadings.count)
-        let difference = averageAltitude - baselineAltitude! + correction
-        let floorNumber = round(difference / averageFloorHeight)
-        let floorString: String
-        if floorNumber > 0 {
-            floorString = "F\(Int(floorNumber))"
-        } else if floorNumber < 0 {
-            floorString = "B\(Int(-floorNumber))"
-        } else {
-            floorString = "G"
-        }
-        completion(floorString)
-    }
-    
-    func saveUserFloorCorrection(selected: String, estimated: String?) {
-        guard let estimated = estimated, let garage = detectedGarageInfo?.1 else { return }
-        // Save per-garage, per-floor altitude mapping
-        if let currentAltitude = currentLocation?.altitude {
-            var garageMap = floorAltitudes[garage] ?? [:]
-            garageMap[selected] = currentAltitude
-            floorAltitudes[garage] = garageMap
-            saveFloorAltitudes()
-        }
-        // Correction logic for smoothing
-        let selectedNum: Double
-        if selected.hasPrefix("F") {
-            selectedNum = Double(String(selected.dropFirst())) ?? 0
-        } else if selected.hasPrefix("B") {
-            selectedNum = -(Double(String(selected.dropFirst())) ?? 0)
-        } else {
-            selectedNum = 0
-        }
-        let estimatedNum: Double
-        if estimated.hasPrefix("F") {
-            estimatedNum = Double(String(estimated.dropFirst())) ?? 0
-        } else if estimated.hasPrefix("B") {
-            estimatedNum = -(Double(String(estimated.dropFirst())) ?? 0)
-        } else {
-            estimatedNum = 0
-        }
-        let adjustment = (selectedNum - estimatedNum) * averageFloorHeight
-        userFloorCorrections[garage] = adjustment
-        saveFloorCorrections()
-        // Future: Send to server for crowdsourcing
-    }
-    
-    private func loadAddressCache() {
-        if let data = UserDefaults.standard.data(forKey: addressCacheKey),
-           let decoded = try? JSONDecoder().decode([String: String].self, from: data) {
-            addressCache = decoded
-            print("📍 Loaded \(addressCache.count) cached addresses")
-        }
-    }
-    
-    private func saveAddressCache() {
-        if let encoded = try? JSONEncoder().encode(addressCache) {
-            UserDefaults.standard.set(encoded, forKey: addressCacheKey)
-        }
-    }
-    
-    private func getCachedAddress(for coordinate: CLLocationCoordinate2D) -> String? {
-        let lat = String(format: "%.4f", coordinate.latitude)
-        let lon = String(format: "%.4f", coordinate.longitude)
-        let key = "\(lat),\(lon)"
-        
-        if let cached = addressCache[key] {
-            return cached
-        }
-        
-        for (cachedKey, cachedAddress) in addressCache {
-            let components = cachedKey.split(separator: ",")
-            if components.count == 2,
-               let cachedLat = Double(components[0]),
-               let cachedLon = Double(components[1]) {
-                
-                let cachedLocation = CLLocation(latitude: cachedLat, longitude: cachedLon)
-                let currentLocation = CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
-                
-                if cachedLocation.distance(from: currentLocation) < 50 {
-                    return cachedAddress
-                }
-            }
-        }
-        
-        return nil
-    }
-    
-    private func cacheAddress(for coordinate: CLLocationCoordinate2D, address: String) {
-        let lat = String(format: "%.4f", coordinate.latitude)
-        let lon = String(format: "%.4f", coordinate.longitude)
-        let key = "\(lat),\(lon)"
-        
-        addressCache[key] = address
-        saveAddressCache()
-    }
-    
     private func formatCoordinatesNicely(_ coordinate: CLLocationCoordinate2D) -> String {
         let latDirection = coordinate.latitude >= 0 ? "N" : "S"
         let lonDirection = coordinate.longitude >= 0 ? "E" : "W"
-        
         let lat = String(format: "%.2f°%@", abs(coordinate.latitude), latDirection)
         let lon = String(format: "%.2f°%@", abs(coordinate.longitude), lonDirection)
-        
         return "\(lat), \(lon)"
     }
     
     private func getSmartAddress(for coordinate: CLLocationCoordinate2D, completion: @escaping (String) -> Void) {
-        if let cached = getCachedAddress(for: coordinate) {
-            completion(cached)
-            return
-        }
-        
         let niceCoordinates = formatCoordinatesNicely(coordinate)
         completion(niceCoordinates)
-        
         let location = CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
         let geocoder = CLGeocoder()
-        
         var hasCompleted = false
-        
         DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
             if !hasCompleted {
                 hasCompleted = true
             }
         }
-        
         geocoder.reverseGeocodeLocation(location) { [weak self] placemarks, error in
             guard !hasCompleted else { return }
             hasCompleted = true
-            
             var address = niceCoordinates
-            
             if let placemark = placemarks?.first, error == nil {
                 if let name = placemark.name, !name.isEmpty {
                     address = name
@@ -256,26 +78,93 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
                 } else if let locality = placemark.locality {
                     address = locality
                 }
-                
-                self?.cacheAddress(for: coordinate, address: address)
-                completion(address)
+                self?.checkForNearbyStores(at: location) { nearbyStore in
+                    if let store = nearbyStore {
+                        completion("Near \(store)")
+                    } else {
+                        completion(address)
+                    }
+                }
+            } else {
+                self?.checkForNearbyStores(at: location) { nearbyStore in
+                    if let store = nearbyStore {
+                        completion("Near \(store)")
+                    } else {
+                        completion(address)
+                    }
+                }
             }
         }
     }
     
-    func enableTestMode() {
-        testModeEnabled = true
-        print("🧪 Test mode enabled")
-        HapticManager.lightImpact()
-        
-        DispatchQueue.main.asyncAfter(deadline: .now() + 60.0) {
-            self.testModeEnabled = false
+    private func checkForNearbyStores(at location: CLLocation, completion: @escaping (String?) -> Void) {
+        let searchRequest = MKLocalSearch.Request()
+        searchRequest.naturalLanguageQuery = "store restaurant shop"
+        searchRequest.region = MKCoordinateRegion(
+            center: location.coordinate,
+            span: MKCoordinateSpan(latitudeDelta: 0.002, longitudeDelta: 0.002)
+        )
+        let search = MKLocalSearch(request: searchRequest)
+        search.start { response, error in
+            guard let response = response, error == nil else {
+                completion(nil)
+                return
+            }
+            let nearbyItems = response.mapItems.filter { item in
+                let distance = location.distance(from: item.placemark.location ?? CLLocation())
+                return distance <= 200
+            }.sorted { item1, item2 in
+                let distance1 = location.distance(from: item1.placemark.location ?? CLLocation())
+                let distance2 = location.distance(from: item2.placemark.location ?? CLLocation())
+                return distance1 < distance2
+            }
+            let preferredKeywords = [
+                "apple", "starbucks", "mcdonalds", "burger king", "wendys", "subway",
+                "target", "walmart", "costco", "best buy", "home depot", "lowes",
+                "cheesecake factory", "olive garden", "red lobster", "outback",
+                "chili's", "tgi fridays", "buffalo wild wings", "chipotle",
+                "panera", "dunkin", "dominos", "pizza hut", "kfc", "popeyes"
+            ]
+            for item in nearbyItems {
+                let name = item.name?.lowercased() ?? ""
+                for keyword in preferredKeywords {
+                    if name.contains(keyword) {
+                        completion(item.name)
+                        return
+                    }
+                }
+            }
+            for item in nearbyItems {
+                let category = item.pointOfInterestCategory
+                if category == .store || category == .restaurant || category == .foodMarket {
+                    completion(item.name)
+                    return
+                }
+            }
+            let mallSearchRequest = MKLocalSearch.Request()
+            mallSearchRequest.naturalLanguageQuery = "mall shopping center"
+            mallSearchRequest.region = MKCoordinateRegion(
+                center: location.coordinate,
+                span: MKCoordinateSpan(latitudeDelta: 0.001, longitudeDelta: 0.001)
+            )
+            let mallSearch = MKLocalSearch(request: mallSearchRequest)
+            mallSearch.start { mallResponse, mallError in
+                if let mallResponse = mallResponse {
+                    for mallItem in mallResponse.mapItems {
+                        let distance = location.distance(from: mallItem.placemark.location ?? CLLocation())
+                        if distance <= 300 {
+                            completion(mallItem.name)
+                            return
+                        }
+                    }
+                }
+                completion(nil)
+            }
         }
     }
     
     func requestLocationPermission() {
         guard CLLocationManager.locationServicesEnabled() else { return }
-        
         switch locationManager.authorizationStatus {
         case .notDetermined:
             locationManager.requestWhenInUseAuthorization()
@@ -294,28 +183,9 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
         guard let location = locations.last else { return }
-        
         DispatchQueue.main.async { [weak self] in
             self?.currentLocation = location
         }
-        // --- Auto-park detection logic ---
-        guard parkedLocation == nil else { return } // Only if not already parked
-        let speed = location.speed >= 0 ? location.speed : lastSpeed
-        lastSpeed = speed
-        if speed < 2.0 { // Stationary or walking (<2 m/s)
-            if stationaryStartTime == nil {
-                stationaryStartTime = Date()
-                autoParkTimer?.invalidate()
-                autoParkTimer = Timer.scheduledTimer(withTimeInterval: 120, repeats: false) { [weak self] _ in
-                    guard let self = self, self.parkedLocation == nil else { return }
-                    self.saveParkedLocation(floor: nil)
-                }
-            }
-        } else {
-            stationaryStartTime = nil
-            autoParkTimer?.invalidate()
-        }
-        // ---
     }
     
     func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
@@ -334,41 +204,12 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     }
     
     func detectParkingType() {
-        guard !isSearchingForGarage else { return }
-        
-        if testModeEnabled {
-            isSearchingForGarage = true
-            
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                self.isSearchingForGarage = false
-                self.detectedGarageInfo = (true, "Test Parking Garage")
-                self.testModeEnabled = false
-            }
-            return
-        }
-        
-        if currentLocation == nil {
-            locationManager.requestLocation()
-            
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                self.detectParkingType()
-            }
-            return
-        }
-        
         guard let location = currentLocation else { return }
-        
-        isSearchingForGarage = true
-        
         checkForParkingGarage(at: location) { [weak self] isInGarage, garageName in
             DispatchQueue.main.async {
-                self?.isSearchingForGarage = false
-                
                 if isInGarage {
                     self?.detectedGarageInfo = (true, garageName)
-                    // --- Push notification for garage floor selection ---
                     self?.sendGarageFloorNotification(garageName: garageName)
-                    // ---
                 } else {
                     self?.saveParkedLocation(floor: nil)
                     self?.detectedGarageInfo = (false, nil)
@@ -396,23 +237,19 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
             center: location.coordinate,
             span: MKCoordinateSpan(latitudeDelta: 0.002, longitudeDelta: 0.002)
         )
-        
         let search = MKLocalSearch(request: searchRequest)
         search.start { response, error in
             guard let response = response, error == nil else {
                 completion(false, nil)
                 return
             }
-            
             for item in response.mapItems {
                 let distance = location.distance(from: item.placemark.location ?? CLLocation())
-                
                 if distance <= 75 {
                     let name = item.name ?? ""
                     let keywords = ["garage", "parking", "structure", "deck", "ramp", "lot", "park"]
                     let isGarage = keywords.contains { name.lowercased().contains($0) } ||
                                    item.pointOfInterestCategory == .parking
-                    
                     if isGarage {
                         let formattedName = self.formatGarageName(for: item)
                         completion(true, formattedName)
@@ -420,14 +257,12 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
                     }
                 }
             }
-            
             completion(false, nil)
         }
     }
     
     private func formatGarageName(for item: MKMapItem) -> String {
         var formattedName = item.name ?? ""
-        
         if !formattedName.isEmpty &&
            (formattedName.lowercased().contains("garage") ||
             formattedName.lowercased().contains("deck") ||
@@ -436,7 +271,6 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
             formattedName.lowercased().contains("center")) {
             return formattedName
         }
-        
         let placemark = item.placemark
         if let street = placemark.thoroughfare, !street.isEmpty {
             if let number = placemark.subThoroughfare {
@@ -454,7 +288,6 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
         } else {
             formattedName = "Parking Garage"
         }
-        
         return formattedName.isEmpty ? "Parking Garage" : formattedName
     }
     
@@ -466,9 +299,7 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     
     func saveParkedLocation(floor: String?) {
         guard let location = currentLocation else { return }
-        
         let garageName = detectedGarageInfo?.1
-        
         let parkingLocation = ParkingLocation(
             id: UUID(),
             coordinate: location.coordinate,
@@ -477,10 +308,8 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
             timestamp: Date(),
             garageName: garageName
         )
-        
         setParkedLocation(parkingLocation)
         HapticManager.mediumImpact()
-        
         getSmartAddress(for: location.coordinate) { [weak self] address in
             DispatchQueue.main.async {
                 let updatedLocation = ParkingLocation(
@@ -491,7 +320,6 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
                     timestamp: parkingLocation.timestamp,
                     garageName: parkingLocation.garageName
                 )
-                
                 self?.setParkedLocation(updatedLocation)
                 self?.saveToUserDefaults(updatedLocation)
             }
@@ -500,7 +328,6 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     
     func updateFloor(_ floor: String) {
         guard let location = parkedLocation else { return }
-        
         let updatedLocation = ParkingLocation(
             id: location.id,
             coordinate: location.coordinate,
@@ -509,7 +336,6 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
             timestamp: location.timestamp,
             garageName: location.garageName
         )
-        
         setParkedLocation(updatedLocation)
         saveToUserDefaults(updatedLocation)
     }
@@ -517,24 +343,17 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     func clearParkedLocation() {
         setParkedLocation(nil)
         UserDefaults.standard.removeObject(forKey: "parkedLocation")
-        
-        // Also clear from shared UserDefaults for widget
         let sharedDefaults = UserDefaults(suiteName: "group.com.tyler.crossstreets")
         sharedDefaults?.removeObject(forKey: "parkedLocation")
-        
-        testModeEnabled = false
         detectedGarageInfo = nil
-        
         HapticManager.lightImpact()
     }
     
     func getDirectionsToParkedCar() {
         guard let parkedLocation = parkedLocation else { return }
-        
         let coordinate = parkedLocation.coordinate
         let mapItem = MKMapItem(placemark: MKPlacemark(coordinate: coordinate))
         mapItem.name = "My Car"
-        
         let launchOptions = [MKLaunchOptionsDirectionsModeKey: MKLaunchOptionsDirectionsModeWalking]
         mapItem.openInMaps(launchOptions: launchOptions)
     }
@@ -542,8 +361,6 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     private func saveToUserDefaults(_ location: ParkingLocation) {
         if let encoded = try? JSONEncoder().encode(location) {
             UserDefaults.standard.set(encoded, forKey: "parkedLocation")
-            
-            // Also save to shared UserDefaults for widget
             let sharedDefaults = UserDefaults(suiteName: "group.com.tyler.crossstreets")
             sharedDefaults?.set(encoded, forKey: "parkedLocation")
         }
@@ -556,7 +373,6 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
         }
     }
     
-    // --- Push notification helper ---
     private func sendGarageFloorNotification(garageName: String?) {
         let content = UNMutableNotificationContent()
         content.title = "Select Your Parking Floor"
@@ -569,5 +385,135 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
         let request = UNNotificationRequest(identifier: "selectFloor", content: content, trigger: nil)
         UNUserNotificationCenter.current().add(request, withCompletionHandler: nil)
     }
-    // ---
+    
+    // Local storage for garage floor corrections
+    private func loadFloorCorrections() {
+        if let data = UserDefaults.standard.data(forKey: correctionsKey),
+           let corrections = try? JSONDecoder().decode([String: [String: Int]].self, from: data) {
+            floorCorrections = corrections
+        }
+    }
+    
+    private func saveFloorCorrections() {
+        if let data = try? JSONEncoder().encode(floorCorrections) {
+            UserDefaults.standard.set(data, forKey: correctionsKey)
+        }
+    }
+    
+    private func loadUserIssues() {
+        if let data = UserDefaults.standard.data(forKey: issuesKey),
+           let issues = try? JSONDecoder().decode([UserIssue].self, from: data) {
+            userIssues = issues
+        }
+    }
+    
+    private func saveUserIssues() {
+        if let data = try? JSONEncoder().encode(userIssues) {
+            UserDefaults.standard.set(data, forKey: issuesKey)
+        }
+    }
+    
+    func recordFloorCorrection(garageName: String, floor: String) {
+        if floorCorrections[garageName] == nil {
+            floorCorrections[garageName] = [:]
+        }
+        floorCorrections[garageName]?[floor, default: 0] += 1
+        saveFloorCorrections()
+    }
+    
+    func logUserIssue(notes: String, issueType: String = "general_issue") {
+        guard let currentLocation = currentLocation else {
+            print("⚠️ Cannot log issue: No current location available")
+            return
+        }
+        
+        // Get current address for context
+        let geocoder = CLGeocoder()
+        geocoder.reverseGeocodeLocation(currentLocation) { placemarks, error in
+            let address = placemarks?.first?.name ?? "Unknown location"
+            
+            let issue = UserIssue(
+                id: UUID(),
+                timestamp: Date(),
+                location: currentLocation.coordinate,
+                address: address,
+                notes: notes,
+                issueType: issueType
+            )
+            
+            DispatchQueue.main.async {
+                self.userIssues.append(issue)
+                self.saveUserIssues()
+                print("✅ Logged user issue: \(notes)")
+            }
+        }
+    }
+    
+    func getFloorCorrectionCount(garageName: String, floor: String) -> Int {
+        return floorCorrections[garageName, default: [:]][floor, default: 0]
+    }
+    
+    func getGarageNames() -> [String] {
+        return Array(floorCorrections.keys).sorted()
+    }
+    
+    func getFloors(for garageName: String) -> [String] {
+        return Array(floorCorrections[garageName, default: [:]].keys).sorted()
+    }
+    
+    // Export correction data for analysis
+    func exportCorrectionData() -> String {
+        var export = "CrossStreets Feedback Data Export\n"
+        export += "Generated: \(Date())\n"
+        export += "Device: \(UIDevice.current.name)\n\n"
+        
+        // Floor Corrections Section
+        export += "=== GARAGE FLOOR CORRECTIONS ===\n"
+        if floorCorrections.isEmpty {
+            export += "No floor corrections recorded yet.\n"
+        } else {
+            for (garageName, floors) in floorCorrections.sorted(by: { $0.key < $1.key }) {
+                export += "Garage: \(garageName)\n"
+                for (floor, count) in floors.sorted(by: { $0.key < $1.key }) {
+                    export += "  Floor \(floor): \(count) corrections\n"
+                }
+                export += "\n"
+            }
+        }
+        
+        // User Issues Section
+        export += "=== USER REPORTED ISSUES ===\n"
+        if userIssues.isEmpty {
+            export += "No user issues reported yet.\n"
+        } else {
+            for issue in userIssues.sorted(by: { $0.timestamp > $1.timestamp }) {
+                export += "Issue ID: \(issue.id)\n"
+                export += "Date: \(issue.timestamp)\n"
+                export += "Type: \(issue.issueType)\n"
+                export += "Location: \(issue.location.latitude), \(issue.location.longitude)\n"
+                export += "Address: \(issue.address)\n"
+                export += "Notes: \(issue.notes)\n"
+                export += "---\n"
+            }
+        }
+        
+        // Summary Statistics
+        let stats = getCorrectionStats()
+        export += "\n=== SUMMARY STATISTICS ===\n"
+        export += "Total garages with corrections: \(stats.totalGarages)\n"
+        export += "Total floor corrections: \(stats.totalCorrections)\n"
+        export += "Total user issues reported: \(userIssues.count)\n"
+        
+        return export
+    }
+    
+    func getCorrectionStats() -> (totalGarages: Int, totalCorrections: Int) {
+        let totalGarages = floorCorrections.count
+        let totalCorrections = floorCorrections.values.flatMap { $0.values }.reduce(0, +)
+        return (totalGarages, totalCorrections)
+    }
+    
+    func getUserIssuesCount() -> Int {
+        return userIssues.count
+    }
 }
