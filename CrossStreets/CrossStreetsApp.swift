@@ -7,6 +7,7 @@ struct CrossStreetsApp: App {
     @State private var isOnline = true
     @State private var showOfflineAlert = false
     @State private var deepLinkDestination: String?
+    @State private var networkCheckDelay = false
     
     // Network monitor
     private let networkMonitor = NWPathMonitor()
@@ -33,8 +34,8 @@ struct CrossStreetsApp: App {
                         }
                 }
                 
-                // Offline indicator
-                if !isOnline && !showSplash {
+                // Offline indicator - only show after delay and when actually offline
+                if !isOnline && !showSplash && networkCheckDelay {
                     VStack {
                         HStack {
                             Image(systemName: "wifi.slash")
@@ -82,15 +83,32 @@ struct CrossStreetsApp: App {
         networkMonitor.pathUpdateHandler = { path in
             DispatchQueue.main.async {
                 let wasOnline = self.isOnline
-                self.isOnline = path.status == .satisfied
+                let newOnlineStatus = path.status == .satisfied
                 
-                // Show offline alert when connection is lost
-                if wasOnline && !self.isOnline {
-                    self.showOfflineAlert = true
+                // Only update if status actually changed
+                if self.isOnline != newOnlineStatus {
+                    self.isOnline = newOnlineStatus
                     
-                    // Auto-hide after 3 seconds
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
-                        self.showOfflineAlert = false
+                    // Add delay before showing offline indicator to prevent false positives
+                    if !newOnlineStatus {
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                            if !self.isOnline {
+                                self.networkCheckDelay = true
+                            }
+                        }
+                    } else {
+                        // Immediately hide offline indicator when back online
+                        self.networkCheckDelay = false
+                    }
+                    
+                    // Show offline alert when connection is lost
+                    if wasOnline && !newOnlineStatus {
+                        self.showOfflineAlert = true
+                        
+                        // Auto-hide after 3 seconds
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+                            self.showOfflineAlert = false
+                        }
                     }
                 }
             }

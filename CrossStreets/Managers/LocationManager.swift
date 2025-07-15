@@ -55,15 +55,22 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     
     private func getSmartAddress(for coordinate: CLLocationCoordinate2D, completion: @escaping (String) -> Void) {
         let niceCoordinates = formatCoordinatesNicely(coordinate)
-        completion(niceCoordinates)
+        
+        // Start with a more user-friendly initial message
+        completion("Getting address...")
+        
         let location = CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
         let geocoder = CLGeocoder()
         var hasCompleted = false
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+        
+        // Shorter timeout for better responsiveness
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
             if !hasCompleted {
                 hasCompleted = true
+                completion(niceCoordinates)
             }
         }
+        
         geocoder.reverseGeocodeLocation(location) { [weak self] placemarks, error in
             guard !hasCompleted else { return }
             hasCompleted = true
@@ -334,9 +341,24 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     }
     
     private func checkNetworkConnectivity() -> Bool {
-        // Simple network check - in a real app you'd use NWPathMonitor
-        // For now, we'll assume online and let the search fail gracefully
-        return true
+        // More robust network check
+        let monitor = NWPathMonitor()
+        var isConnected = false
+        let semaphore = DispatchSemaphore(value: 0)
+        
+        monitor.pathUpdateHandler = { path in
+            isConnected = path.status == .satisfied
+            semaphore.signal()
+        }
+        
+        let queue = DispatchQueue(label: "NetworkCheck")
+        monitor.start(queue: queue)
+        
+        // Wait for a short time to get the network status
+        _ = semaphore.wait(timeout: .now() + 0.5)
+        monitor.cancel()
+        
+        return isConnected
     }
     
     // MARK: - Performance Optimizations
@@ -487,13 +509,15 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
         let parkingLocation = ParkingLocation(
             id: UUID(),
             coordinate: location.coordinate,
-            address: "Locating...",
+            address: "Getting address...", // Better initial state
             floor: floor,
             timestamp: Date(),
             garageName: garageName
         )
         setParkedLocation(parkingLocation)
         HapticManager.mediumImpact()
+        
+        // Get the smart address with better loading state
         getSmartAddress(for: location.coordinate) { [weak self] address in
             DispatchQueue.main.async {
                 let updatedLocation = ParkingLocation(
