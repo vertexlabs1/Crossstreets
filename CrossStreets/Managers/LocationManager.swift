@@ -4,6 +4,7 @@ import MapKit
 import UIKit
 import UserNotifications
 import SwiftUI // Added for @AppStorage
+import Network // Added for NWPathMonitor
 
 class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     private let locationManager = CLLocationManager()
@@ -346,7 +347,7 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
         var isConnected = false
         let semaphore = DispatchSemaphore(value: 0)
         
-        monitor.pathUpdateHandler = { path in
+        monitor.pathUpdateHandler = { (path: NWPath) in
             isConnected = path.status == .satisfied
             semaphore.signal()
         }
