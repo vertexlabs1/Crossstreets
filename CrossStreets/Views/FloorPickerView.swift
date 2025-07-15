@@ -4,35 +4,13 @@ struct FloorPickerView: View {
     @Binding var showingFloorPicker: Bool
     @ObservedObject var locationManager: LocationManager
     let garageName: String
-    
     @State private var selectedFloor: String?
+    @State private var detectedFloor: String?
     @State private var showingAllFloors = false
-    
-    let mainFloors = ["F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8", "F9", "F10", "RF"]
-    let basementFloors = ["B3", "B2", "B1"]
-    let commonFloors = ["G", "F1", "F2", "F3", "B1", "B2", "RF"] // Most common floors first
-    let allFloors: [String] = {
-        var floors: [String] = []
-        
-        // Start with most common floors
-        floors.append(contentsOf: ["G", "F1", "F2", "F3", "B1", "B2", "RF"])
-        
-        // Add remaining basement floors
-        for i in (3...10).reversed() {
-            floors.append("B\(i)")
-        }
-        
-        // Add remaining main floors
-        for i in 4...50 {
-            floors.append("F\(i)")
-        }
-        
-        return floors
-    }()
     
     var body: some View {
         ZStack {
-            Color.black.opacity(0.3)
+            Color.black.opacity(0.4)
                 .ignoresSafeArea()
                 .onTapGesture {
                     showingFloorPicker = false
@@ -41,77 +19,67 @@ struct FloorPickerView: View {
             VStack {
                 Spacer()
                 
-                VStack(spacing: 16) {
+                VStack(spacing: 20) {
+                    // Header
                     VStack(spacing: 8) {
-                        Text("SELECT FLOOR")
-                            .font(.system(size: 13, weight: .bold))
-                            .foregroundColor(.black.opacity(0.6))
-                            .tracking(1)
+                        Image(systemName: "building.2.fill")
+                            .font(.system(size: 40))
+                            .foregroundColor(.blue)
                         
-                        Text(garageName)
-                            .font(.system(size: 18, weight: .semibold))
-                            .foregroundColor(.black)
-                            .lineLimit(2)
-                            .multilineTextAlignment(.center)
-                            .padding(.horizontal, 10)
+                        Text("Select Your Floor")
+                            .font(.title2)
+                            .fontWeight(.semibold)
+                        
+                        if let detectedFloor = detectedFloor {
+                            Text("We detected you're on **\(detectedFloor)**. Please correct if this is wrong so we can learn!")
+                                .font(.body)
+                                .foregroundColor(.secondary)
+                                .multilineTextAlignment(.center)
+                                .padding(.horizontal)
+                        } else {
+                            Text("Select the floor where you parked")
+                                .font(.body)
+                                .foregroundColor(.secondary)
+                                .multilineTextAlignment(.center)
+                                .padding(.horizontal)
+                        }
                     }
-                    .padding(.top, 8)
                     
-                    if !showingAllFloors {
-                        QuickFloorSelectionView(
-                            selectedFloor: $selectedFloor,
-                            mainFloors: mainFloors,
-                            basementFloors: basementFloors,
-                            showingAllFloors: $showingAllFloors,
-                            saveAction: saveAndClose,
-                            estimatedFloor: nil
-                        )
-                    } else {
+                    // Floor Selection
+                    if showingAllFloors {
                         AllFloorsView(
                             selectedFloor: $selectedFloor,
-                            allFloors: allFloors,
+                            allFloors: getAllFloors(),
                             showingAllFloors: $showingAllFloors,
                             saveAction: saveAndClose,
-                            estimatedFloor: nil
+                            estimatedFloor: detectedFloor
+                        )
+                    } else {
+                        QuickFloorSelectionView(
+                            selectedFloor: $selectedFloor,
+                            mainFloors: getMainFloors(),
+                            basementFloors: getBasementFloors(),
+                            showingAllFloors: $showingAllFloors,
+                            saveAction: saveAndClose,
+                            estimatedFloor: detectedFloor
                         )
                     }
                     
-                    HStack(spacing: 12) {
-                        Button(action: {
-                            locationManager.saveParkedLocation(floor: nil)
-                            showingFloorPicker = false
-                        }) {
-                            Text("Skip")
+                    // Save Button
+                    if selectedFloor != nil {
+                        Button(action: saveAndClose) {
+                            Text("Save")
                                 .font(.system(size: 16, weight: .semibold))
-                                .foregroundColor(.black.opacity(0.7))
+                                .foregroundColor(.white)
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 16)
                                 .background(
                                     RoundedRectangle(cornerRadius: 14)
-                                        .fill(Color.white)
-                                        .overlay(
-                                            RoundedRectangle(cornerRadius: 14)
-                                                .strokeBorder(Color.gray.opacity(0.3), lineWidth: 1.5)
-                                        )
-                                        .shadow(color: .black.opacity(0.08), radius: 4, y: 2)
+                                        .fill(Color.blue)
+                                        .shadow(color: .blue.opacity(0.3), radius: 8, y: 4)
                                 )
                         }
-                        
-                        if selectedFloor != nil {
-                            Button(action: saveAndClose) {
-                                Text("Save")
-                                    .font(.system(size: 16, weight: .semibold))
-                                    .foregroundColor(.white)
-                                    .frame(maxWidth: .infinity)
-                                    .padding(.vertical, 16)
-                                    .background(
-                                        RoundedRectangle(cornerRadius: 14)
-                                            .fill(Color.blue)
-                                            .shadow(color: .blue.opacity(0.3), radius: 8, y: 4)
-                                    )
-                            }
-                            .transition(.scale.combined(with: .opacity))
-                        }
+                        .transition(.scale.combined(with: .opacity))
                     }
                 }
                 .padding(28)
@@ -123,12 +91,26 @@ struct FloorPickerView: View {
                 )
             }
         }
+        .onAppear {
+            // Detect floor when view appears
+            detectedFloor = locationManager.detectFloorForGarage(garageName)
+        }
     }
     
     private func saveAndClose() {
         guard let floor = selectedFloor else { return }
         
         HapticManager.lightImpact()
+        
+        // Log the floor detection result
+        if let detectedFloor = detectedFloor {
+            locationManager.logFloorDetectionResult(
+                detectedFloor: detectedFloor,
+                actualFloor: floor,
+                garageName: garageName
+            )
+        }
+        
         locationManager.saveParkedLocation(floor: floor)
         showingFloorPicker = false
     }
@@ -137,10 +119,17 @@ struct FloorPickerView: View {
         selectedFloor = floor
         showingFloorPicker = false
         
-        // Record the correction for data collection
-        if let garageName = locationManager.parkedLocation?.garageName {
-            locationManager.recordFloorCorrection(garageName: garageName, floor: floor)
+        // Log the floor detection result
+        if let detectedFloor = detectedFloor {
+            locationManager.logFloorDetectionResult(
+                detectedFloor: detectedFloor,
+                actualFloor: floor,
+                garageName: garageName
+            )
         }
+        
+        // Record the correction for data collection
+        locationManager.recordFloorCorrection(garageName: garageName, floor: floor)
         
         // Update the parked location with the selected floor
         if var updatedLocation = locationManager.parkedLocation {
@@ -150,6 +139,18 @@ struct FloorPickerView: View {
         }
         
         HapticManager.mediumImpact()
+    }
+    
+    private func getMainFloors() -> [String] {
+        return ["G", "F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8", "F9", "F10"]
+    }
+    
+    private func getBasementFloors() -> [String] {
+        return ["B1", "B2", "B3", "B4"]
+    }
+    
+    private func getAllFloors() -> [String] {
+        return getBasementFloors() + getMainFloors()
     }
 }
 

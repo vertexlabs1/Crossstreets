@@ -20,8 +20,10 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     // Local storage for garage floor corrections
     private let correctionsKey = "garageFloorCorrections"
     private let issuesKey = "userReportedIssues"
+    private let altitudeDataKey = "garageAltitudeData"
     private var floorCorrections: [String: [String: Int]] = [:] // [garageName: [floor: count]]
     private var userIssues: [UserIssue] = []
+    private var garageAltitudeData: [String: GarageAltitudeData] = [:] // [garageName: altitudeData]
     
     struct UserIssue: Codable {
         let id: UUID
@@ -32,12 +34,35 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
         let issueType: String // "floor_correction", "general_issue", "feature_request", etc.
     }
     
+    struct GarageAltitudeData: Codable {
+        let garageName: String
+        let floorElevations: [String: Double] // [floor: altitude]
+        let totalCorrections: Int
+        let lastUpdated: Date
+        let gpsAccuracy: Double
+        let barometricAvailable: Bool
+    }
+    
+    struct FloorDetectionMetadata: Codable {
+        let timestamp: Date
+        let garageName: String
+        let detectedFloor: String
+        let actualFloor: String
+        let altitude: Double
+        let gpsAccuracy: Double
+        let barometricPressure: Double?
+        let wasCorrect: Bool
+        let location: CLLocationCoordinate2D
+        let address: String
+    }
+    
     override init() {
         super.init()
         setupLocationManager()
         loadParkedLocation()
         loadFloorCorrections()
         loadUserIssues()
+        loadAltitudeData()
     }
     
     private func setupLocationManager() {
@@ -691,6 +716,25 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
             }
         }
         
+        // Altitude Data Section
+        export += "=== ALTITUDE-BASED FLOOR DETECTION DATA ===\n"
+        if garageAltitudeData.isEmpty {
+            export += "No altitude data recorded yet.\n"
+        } else {
+            for (garageName, altitudeData) in garageAltitudeData.sorted(by: { $0.key < $1.key }) {
+                export += "Garage: \(garageName)\n"
+                export += "  Total Corrections: \(altitudeData.totalCorrections)\n"
+                export += "  Last Updated: \(altitudeData.lastUpdated)\n"
+                export += "  GPS Accuracy: \(String(format: "%.1f", altitudeData.gpsAccuracy))m\n"
+                export += "  Barometric Available: \(altitudeData.barometricAvailable ? "Yes" : "No")\n"
+                export += "  Floor Elevations:\n"
+                for (floor, elevation) in altitudeData.floorElevations.sorted(by: { $0.key < $1.key }) {
+                    export += "    \(floor): \(String(format: "%.1f", elevation))m\n"
+                }
+                export += "\n"
+            }
+        }
+        
         // User Issues Section
         export += "=== USER REPORTED ISSUES ===\n"
         if userIssues.isEmpty {
@@ -713,6 +757,7 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
         export += "Total garages with corrections: \(stats.totalGarages)\n"
         export += "Total floor corrections: \(stats.totalCorrections)\n"
         export += "Total user issues reported: \(userIssues.count)\n"
+        export += "Total garages with altitude data: \(garageAltitudeData.count)\n"
         
         return export
     }
@@ -725,5 +770,124 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     
     func getUserIssuesCount() -> Int {
         return userIssues.count
+    }
+    
+    // MARK: - Altitude-Based Floor Detection
+    
+    func detectFloorForGarage(_ garageName: String) -> String? {
+        guard let location = currentLocation else { return nil }
+        
+        // Get altitude with smart rounding
+        let altitude = roundAltitude(location.altitude)
+        let accuracy = location.verticalAccuracy
+        
+        // Check if we have existing data for this garage
+        if let garageData = garageAltitudeData[garageName] {
+            return predictFloorFromAltitude(altitude, garageData: garageData)
+        }
+        
+        // No existing data, make educated guess based on common patterns
+        return makeInitialFloorGuess(altitude: altitude, garageName: garageName)
+    }
+    
+    private func roundAltitude(_ altitude: Double) -> Double {
+        // Round to nearest 3 meters (typical floor height)
+        return round(altitude / 3.0) * 3.0
+    }
+    
+    private func predictFloorFromAltitude(_ altitude: Double, garageData: GarageAltitudeData) -> String? {
+        var bestFloor: String?
+        var smallestDifference = Double.infinity
+        
+        for (floor, floorAltitude) in garageData.floorElevations {
+            let difference = abs(altitude - floorAltitude)
+            if difference < smallestDifference {
+                smallestDifference = difference
+                bestFloor = floor
+            }
+        }
+        
+        // Only return prediction if difference is reasonable (within 6 meters)
+        return smallestDifference <= 6.0 ? bestFloor : nil
+    }
+    
+    private func makeInitialFloorGuess(altitude: Double, garageName: String) -> String {
+        // Common garage patterns
+        let lowerCaseName = garageName.lowercased()
+        
+        if lowerCaseName.contains("underground") || lowerCaseName.contains("basement") {
+            return altitude < 0 ? "B1" : "G"
+        } else if lowerCaseName.contains("ground") || lowerCaseName.contains("main") {
+            return "G"
+        } else if altitude < -5 {
+            return "B1"
+        } else if altitude < 0 {
+            return "G"
+        } else if altitude < 10 {
+            return "F1"
+        } else {
+            return "F1"
+        }
+    }
+    
+    func logFloorDetectionResult(detectedFloor: String, actualFloor: String, garageName: String) {
+        guard let location = currentLocation else { return }
+        
+        let altitude = roundAltitude(location.altitude)
+        let wasCorrect = detectedFloor == actualFloor
+        
+        // Create metadata
+        let metadata = FloorDetectionMetadata(
+            timestamp: Date(),
+            garageName: garageName,
+            detectedFloor: detectedFloor,
+            actualFloor: actualFloor,
+            altitude: altitude,
+            gpsAccuracy: location.verticalAccuracy,
+            barometricPressure: nil, // TODO: Add barometric pressure if available
+            wasCorrect: wasCorrect,
+            location: location.coordinate,
+            address: "Getting address..." // Will be updated later
+        )
+        
+        // Update garage altitude data
+        updateGarageAltitudeData(metadata: metadata)
+        
+        // Log for analysis
+        print("📊 Floor Detection: \(detectedFloor) → \(actualFloor) (\(wasCorrect ? "✅" : "❌")) Altitude: \(altitude)m")
+    }
+    
+    private func updateGarageAltitudeData(metadata: FloorDetectionMetadata) {
+        if garageAltitudeData[metadata.garageName] == nil {
+            garageAltitudeData[metadata.garageName] = GarageAltitudeData(
+                garageName: metadata.garageName,
+                floorElevations: [:],
+                totalCorrections: 0,
+                lastUpdated: Date(),
+                gpsAccuracy: metadata.gpsAccuracy,
+                barometricAvailable: metadata.barometricPressure != nil
+            )
+        }
+        
+        // Update floor elevation data
+        garageAltitudeData[metadata.garageName]?.floorElevations[metadata.actualFloor] = metadata.altitude
+        garageAltitudeData[metadata.garageName]?.totalCorrections += 1
+        garageAltitudeData[metadata.garageName]?.lastUpdated = Date()
+        
+        // Save updated data
+        saveAltitudeData()
+    }
+    
+    private func loadAltitudeData() {
+        if let data = UserDefaults.standard.data(forKey: altitudeDataKey),
+           let altitudeData = try? JSONDecoder().decode([String: GarageAltitudeData].self, from: data) {
+            garageAltitudeData = altitudeData
+        }
+    }
+    
+    private func saveAltitudeData() {
+        if let data = try? JSONEncoder().encode(garageAltitudeData) {
+            UserDefaults.standard.set(data, forKey: altitudeDataKey)
+        }
     }
 }
