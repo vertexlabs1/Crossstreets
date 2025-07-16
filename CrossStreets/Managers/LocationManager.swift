@@ -179,7 +179,10 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
                 // Use the current authorization status from our published property instead of calling it directly
                 switch self.authorizationStatus {
                 case .notDetermined:
-                    self.locationManager.requestWhenInUseAuthorization()
+                    // Move the authorization request to background queue to prevent UI blocking
+                    DispatchQueue.global(qos: .userInitiated).async {
+                        self.locationManager.requestWhenInUseAuthorization()
+                    }
                 case .authorizedWhenInUse, .authorizedAlways:
                     self.locationManager.startUpdatingLocation()
                     self.isLocationEnabled = true
