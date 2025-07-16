@@ -5,6 +5,7 @@ struct SettingsView: View {
     @Binding var selectedTab: Int
     @State private var showingLogIssue = false
     @State private var showingExportSheet = false
+    @State private var showingClearDataAlert = false
     
     var body: some View {
         VStack(spacing: 0) {
@@ -50,6 +51,22 @@ struct SettingsView: View {
                                 .cornerRadius(10)
                             }
                             
+                            // Data Summary
+                            let stats = locationManager.getCorrectionStats()
+                            let issueCount = locationManager.getUserIssuesCount()
+                            HStack {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("Feedback Data Summary")
+                                        .font(.system(size: 12, weight: .medium))
+                                        .foregroundColor(.secondary)
+                                    Text("\(stats.totalGarages) garages, \(stats.totalCorrections) corrections, \(issueCount) issues")
+                                        .font(.system(size: 11))
+                                        .foregroundColor(.secondary.opacity(0.8))
+                                }
+                                Spacer()
+                            }
+                            .padding(.horizontal, 4)
+                            
                             Button(action: { 
                                 HapticManager.lightImpact()
                                 showingExportSheet = true 
@@ -64,6 +81,23 @@ struct SettingsView: View {
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 12)
                                 .background(Color.blue)
+                                .cornerRadius(10)
+                            }
+                            
+                            Button(action: { 
+                                HapticManager.lightImpact()
+                                showingClearDataAlert = true 
+                            }) {
+                                HStack {
+                                    Image(systemName: "trash.fill")
+                                        .font(.system(size: 16))
+                                    Text("Clear Feedback Data")
+                                        .font(.system(size: 16, weight: .semibold))
+                                }
+                                .foregroundColor(.white)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 12)
+                                .background(Color.red)
                                 .cornerRadius(10)
                             }
                         }
@@ -324,6 +358,14 @@ struct SettingsView: View {
         .sheet(isPresented: $showingExportSheet) {
             ExportDataView(locationManager: locationManager)
         }
+        .alert("Clear Feedback Data", isPresented: $showingClearDataAlert) {
+            Button("Cancel", role: .cancel) { }
+            Button("Clear All Data", role: .destructive) {
+                clearAllFeedbackData()
+            }
+        } message: {
+            Text("This will permanently delete all feedback data, floor corrections, and user issues. This action cannot be undone.")
+        }
     }
     
     private func openVertexLabsWebsite() {
@@ -362,6 +404,11 @@ struct SettingsView: View {
         if let url = URL(string: UIApplication.openSettingsURLString) {
             UIApplication.shared.open(url)
         }
+    }
+    
+    private func clearAllFeedbackData() {
+        locationManager.clearAllFeedbackData()
+        showingClearDataAlert = false
     }
 }
 

@@ -29,7 +29,7 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
         let id: UUID
         let timestamp: Date
         let location: CLLocationCoordinate2D
-        let address: String
+        var address: String
         let notes: String
         let issueType: String // "floor_correction", "general_issue", "feature_request", etc.
     }
@@ -338,11 +338,51 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
                 self.detectedGarageInfo = (true, garageName)
                 self.sendGarageFloorNotification(garageName: garageName)
             } else {
-                self.saveParkedLocation(floor: nil)
-                self.detectedGarageInfo = (false, nil)
+                // FALLBACK: Check if we're in a dense urban area that might have parking
+                let isUrbanArea = self.isInUrbanArea(at: currentLocation)
+                if isUrbanArea {
+                    print("🏙️ Urban area detected - offering floor selection as fallback")
+                    self.detectedGarageInfo = (true, "Urban Parking Area")
+                    self.sendGarageFloorNotification(garageName: "Urban Parking Area")
+                } else {
+                    self.saveParkedLocation(floor: nil)
+                    self.detectedGarageInfo = (false, nil)
+                }
             }
             completion()
         }
+    }
+    
+    private func isInUrbanArea(at location: CLLocation) -> Bool {
+        // Simple heuristic: check if we're in a city with dense development
+        // This is a basic implementation - could be enhanced with more sophisticated urban detection
+        
+        // For now, we'll use a conservative approach:
+        // If we're in a location that has multiple nearby POIs, it's likely urban
+        let searchRequest = MKLocalSearch.Request()
+        searchRequest.naturalLanguageQuery = "business"
+        searchRequest.region = MKCoordinateRegion(
+            center: location.coordinate,
+            latitudinalMeters: 200, // 200m radius
+            longitudinalMeters: 200
+        )
+        
+        let search = MKLocalSearch(request: searchRequest)
+        var isUrban = false
+        let semaphore = DispatchSemaphore(value: 0)
+        
+        search.start { response, error in
+            if let response = response, response.mapItems.count >= 3 {
+                // If there are 3+ businesses in 200m radius, likely urban
+                isUrban = true
+            }
+            semaphore.signal()
+        }
+        
+        // Wait for a short time, default to false if timeout
+        _ = semaphore.wait(timeout: .now() + 2.0)
+        
+        return isUrban
     }
     
     private func checkNetworkConnectivity() -> Bool {
@@ -477,13 +517,37 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
             
             print("🔍 Found \(response.mapItems.count) items for '\(query)'")
             
+            // Debug: Log all found items for analysis
+            for (index, item) in response.mapItems.enumerated() {
+                let distance = location.distance(from: item.placemark.location ?? CLLocation())
+                let category = item.pointOfInterestCategory?.rawValue ?? "unknown"
+                print("🔍 Item \(index): '\(item.name ?? "unnamed")' at \(distance)m, category: \(category)")
+            }
+            
             for item in response.mapItems {
                 let distance = location.distance(from: item.placemark.location ?? CLLocation())
-                // STRICT: Only match if within 30m and name contains 'garage' or 'structure' and is .parking
                 let name = item.name?.lowercased() ?? ""
-                let isGarage = (distance <= 30) &&
-                    (name.contains("garage") || name.contains("structure")) &&
-                    (item.pointOfInterestCategory == .parking)
+                
+                // IMPROVED: More flexible garage detection
+                let isGarage = (distance <= 50) && // Increased from 30m to 50m
+                    (
+                        // Check for explicit garage keywords
+                        name.contains("garage") || 
+                        name.contains("structure") ||
+                        name.contains("deck") ||
+                        name.contains("lot") ||
+                        name.contains("parking") ||
+                        // Check if it's categorized as parking
+                        item.pointOfInterestCategory == .parking ||
+                        // Check for common parking facility patterns
+                        name.contains("park") ||
+                        name.contains("p&r") || // Park & Ride
+                        name.contains("commuter") ||
+                        // Check address patterns that suggest parking
+                        (item.placemark.thoroughfare?.lowercased().contains("parking") == true) ||
+                        (item.placemark.name?.lowercased().contains("parking") == true)
+                    )
+                
                 if isGarage {
                     let formattedName = self.formatGarageName(for: item)
                     print("✅ Found garage: \(formattedName) at distance \(distance)m")
@@ -498,31 +562,46 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     
     private func formatGarageName(for item: MKMapItem) -> String {
         var formattedName = item.name ?? ""
+        
+        // If the name already contains parking-related keywords, use it as-is
         if !formattedName.isEmpty &&
            (formattedName.lowercased().contains("garage") ||
             formattedName.lowercased().contains("deck") ||
             formattedName.lowercased().contains("parking") ||
             formattedName.lowercased().contains("structure") ||
-            formattedName.lowercased().contains("center")) {
+            formattedName.lowercased().contains("center") ||
+            formattedName.lowercased().contains("lot") ||
+            formattedName.lowercased().contains("p&r") ||
+            formattedName.lowercased().contains("commuter")) {
             return formattedName
         }
+        
+        // Try to create a meaningful name from the placemark
         let placemark = item.placemark
         if let street = placemark.thoroughfare, !street.isEmpty {
             if let number = placemark.subThoroughfare {
-                formattedName = "\(number) \(street) Garage"
+                formattedName = "\(number) \(street) Parking"
             } else {
-                formattedName = "\(street) Garage"
+                formattedName = "\(street) Parking"
             }
         } else if let name = placemark.name, !name.isEmpty {
             formattedName = name
+            // Only add "Parking" if it doesn't already contain parking-related words
             if !formattedName.lowercased().contains("garage") &&
                !formattedName.lowercased().contains("deck") &&
-               !formattedName.lowercased().contains("parking") {
-                formattedName = "\(formattedName) Garage"
+               !formattedName.lowercased().contains("parking") &&
+               !formattedName.lowercased().contains("lot") {
+                formattedName = "\(formattedName) Parking"
             }
         } else {
-            formattedName = "Parking Garage"
+            // Fallback: use nearby street name if available
+            if let nearbyStreet = placemark.thoroughfare {
+                formattedName = "\(nearbyStreet) Parking"
+            } else {
+                formattedName = "Parking Garage"
+            }
         }
+        
         return formattedName.isEmpty ? "Parking Garage" : formattedName
     }
     
@@ -671,6 +750,52 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
         }
         floorCorrections[garageName]?[floor, default: 0] += 1
         saveFloorCorrections()
+    }
+    
+    func logGarageDetectionFailure(location: CLLocation, notes: String = "") {
+        let issue = UserIssue(
+            id: UUID(),
+            timestamp: Date(),
+            location: location.coordinate,
+            address: "Getting address...",
+            notes: "Garage detection failed: \(notes)",
+            issueType: "garage_detection_failure"
+        )
+        
+        userIssues.append(issue)
+        saveUserIssues()
+        
+        // Get address for context
+        let geocoder = CLGeocoder()
+        geocoder.reverseGeocodeLocation(location) { placemarks, error in
+            let address = placemarks?.first?.name ?? "Unknown location"
+            
+            DispatchQueue.main.async {
+                // Update the issue with the address
+                if let index = self.userIssues.firstIndex(where: { $0.id == issue.id }) {
+                    self.userIssues[index].address = address
+                    self.saveUserIssues()
+                }
+            }
+        }
+        
+        print("📊 Logged garage detection failure at \(location.coordinate)")
+    }
+    
+    func clearAllFeedbackData() {
+        // Clear floor corrections
+        floorCorrections.removeAll()
+        saveFloorCorrections()
+        
+        // Clear user issues
+        userIssues.removeAll()
+        saveUserIssues()
+        
+        // Clear altitude data
+        garageAltitudeData.removeAll()
+        saveAltitudeData()
+        
+        print("🗑️ Cleared all feedback data")
     }
     
     func logUserIssue(notes: String, issueType: String = "general_issue") {

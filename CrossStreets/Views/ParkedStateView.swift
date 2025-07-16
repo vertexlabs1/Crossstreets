@@ -27,7 +27,7 @@ struct ParkedStateView: View {
                         .onAppear {
                             displayAddress = parkedLocation.address
                         }
-                        .onChange(of: parkedLocation.address) { newAddress in
+                        .onChange(of: parkedLocation.address) { oldValue, newAddress in
                             Task { @MainActor in
                                 displayAddress = newAddress
                             }

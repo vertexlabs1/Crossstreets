@@ -23,7 +23,7 @@ struct CurrentParkingView: View {
                             .onAppear {
                                 displayAddress = parking.address
                             }
-                            .onChange(of: parking.address) { newValue in
+                            .onChange(of: parking.address) { oldValue, newValue in
                                 displayAddress = newValue
                             }
                         

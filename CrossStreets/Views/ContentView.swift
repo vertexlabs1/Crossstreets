@@ -248,7 +248,7 @@ struct ContentView: View {
             HistoryView(locationManager: locationManager, selectedTab: $selectedTab)
                 .presentationDetents([.medium, .large])
         }
-        .onChange(of: selectedTab) { newValue in
+        .onChange(of: selectedTab) { oldValue, newValue in
             if newValue == 2 {
                 showSettingsSheet = true
             } else {
@@ -275,13 +275,13 @@ struct ContentView: View {
         } message: {
             Text(errorMessage)
         }
-        .onChange(of: isOnline) { online in
+        .onChange(of: isOnline) { oldValue, online in
             if !online {
                 errorMessage = "You're offline. Some features may not work properly."
                 showErrorAlert = true
             }
         }
-        .onChange(of: deepLinkDestination) { destination in
+        .onChange(of: deepLinkDestination) { oldValue, destination in
             if let destination = destination {
                 // Handle deep link
                 switch destination {
