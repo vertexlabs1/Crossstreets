@@ -30,10 +30,10 @@ struct FloorPickerView: View {
                             .font(.title2)
                             .fontWeight(.semibold)
                         
-                        if let detectedFloor = detectedFloor {
+                        if let detectedFloor = detectedFloor, garageName != "Custom Location" {
                             Text("We detected you're on **\(detectedFloor)**. Please correct if this is wrong so we can learn!")
                                 .font(.body)
-                                .foregroundColor(.secondary)
+                                .foregroundColor(.primary)
                                 .multilineTextAlignment(.center)
                                 .padding(.horizontal)
                         } else {
@@ -92,6 +92,8 @@ struct FloorPickerView: View {
             }
         }
         .onAppear {
+            // Prevent multiple detections if view is re-appeared rapidly
+            guard detectedFloor == nil else { return }
             // Detect floor when view appears
             detectedFloor = locationManager.detectFloorForGarage(garageName)
         }
@@ -99,6 +101,9 @@ struct FloorPickerView: View {
     
     private func saveAndClose() {
         guard let floor = selectedFloor else { return }
+        
+        // Start performance monitoring
+        PerformanceMonitor.shared.startAction("floor_save")
         
         HapticManager.lightImpact()
         
@@ -113,9 +118,15 @@ struct FloorPickerView: View {
         
         locationManager.saveParkedLocation(floor: floor)
         showingFloorPicker = false
+        
+        // End performance monitoring
+        PerformanceMonitor.shared.endAction("floor_save", screen: "floor_picker", success: true, context: ["floor": floor, "garage": garageName])
     }
     
     private func selectFloor(_ floor: String) {
+        // Start performance monitoring
+        PerformanceMonitor.shared.startAction("floor_selection")
+        
         selectedFloor = floor
         showingFloorPicker = false
         
@@ -128,8 +139,7 @@ struct FloorPickerView: View {
             )
         }
         
-        // Record the correction for data collection
-        locationManager.recordFloorCorrection(garageName: garageName, floor: floor)
+        // Removed: recordFloorCorrection() - now handled by Supabase
         
         // Update the parked location with the selected floor
         if var updatedLocation = locationManager.parkedLocation {
@@ -139,6 +149,9 @@ struct FloorPickerView: View {
         }
         
         HapticManager.mediumImpact()
+        
+        // End performance monitoring
+        PerformanceMonitor.shared.endAction("floor_selection", screen: "floor_picker", success: true, context: ["floor": floor, "garage": garageName])
     }
     
     private func getMainFloors() -> [String] {

@@ -17,13 +17,11 @@
 	</array>
 	<key>NSUserNotificationUsageDescription</key>
 	<string>CrossStreets sends alerts for parking reminders.</string>
+	<key>NSMotionUsageDescription</key>
+	<string>CrossStreets uses motion data to improve floor detection accuracy in parking garages by measuring barometric pressure for more precise altitude readings.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>location</string>
-	</array>
-	<key>UIDeviceFamily</key>
-	<array>
-		<integer>1</integer>
 	</array>
 </dict>
 </plist>

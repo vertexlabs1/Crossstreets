@@ -4,8 +4,6 @@ struct SettingsView: View {
     @ObservedObject var locationManager: LocationManager
     @Binding var selectedTab: Int
     @State private var showingLogIssue = false
-    @State private var showingExportSheet = false
-    @State private var showingClearDataAlert = false
     
     var body: some View {
         VStack(spacing: 0) {
@@ -29,7 +27,7 @@ struct SettingsView: View {
                             Image(systemName: "message.fill")
                                 .font(.system(size: 14))
                                 .foregroundColor(.orange)
-                            Text("Feedback & Data")
+                            Text("Feedback")
                                 .font(.headline)
                         }
                         
@@ -51,55 +49,8 @@ struct SettingsView: View {
                                 .cornerRadius(10)
                             }
                             
-                            // Data Summary
-                            let stats = locationManager.getCorrectionStats()
-                            let issueCount = locationManager.getUserIssuesCount()
-                            HStack {
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text("Feedback Data Summary")
-                                        .font(.system(size: 12, weight: .medium))
-                                        .foregroundColor(.secondary)
-                                    Text("\(stats.totalGarages) garages, \(stats.totalCorrections) corrections, \(issueCount) issues")
-                                        .font(.system(size: 11))
-                                        .foregroundColor(.secondary.opacity(0.8))
-                                }
-                                Spacer()
-                            }
-                            .padding(.horizontal, 4)
-                            
-                            Button(action: { 
-                                HapticManager.lightImpact()
-                                showingExportSheet = true 
-                            }) {
-                                HStack {
-                                    Image(systemName: "square.and.arrow.up")
-                                        .font(.system(size: 16))
-                                    Text("Export Feedback Data")
-                                        .font(.system(size: 16, weight: .semibold))
-                                }
-                                .foregroundColor(.white)
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 12)
-                                .background(Color.blue)
-                                .cornerRadius(10)
-                            }
-                            
-                            Button(action: { 
-                                HapticManager.lightImpact()
-                                showingClearDataAlert = true 
-                            }) {
-                                HStack {
-                                    Image(systemName: "trash.fill")
-                                        .font(.system(size: 16))
-                                    Text("Clear Feedback Data")
-                                        .font(.system(size: 16, weight: .semibold))
-                                }
-                                .foregroundColor(.white)
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 12)
-                                .background(Color.red)
-                                .cornerRadius(10)
-                            }
+
+
                         }
                     }
                     .padding(.top, 8)
@@ -145,43 +96,9 @@ struct SettingsView: View {
                         }
                         .padding(.top, 12)
                         
-                        // Garage Floor Correction Data
-                        VStack(alignment: .leading, spacing: 12) {
-                            HStack {
-                                Image(systemName: "building.2.fill")
-                                    .font(.system(size: 14))
-                                    .foregroundColor(.green)
-                                Text("Garage Floor Data")
-                                    .font(.headline)
-                            }
-                            
-                            let stats = locationManager.getCorrectionStats()
-                            Text("\(stats.totalGarages) garages, \(stats.totalCorrections) corrections")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
-                        .padding(.top, 12)
+
                         
-                        Button(action: {
-                            let exportData = locationManager.exportCorrectionData()
-                            // For now, just print to console - you can add sharing later
-                            print("=== GARAGE FLOOR CORRECTION DATA ===")
-                            print(exportData)
-                            print("=====================================")
-                        }) {
-                            HStack {
-                                Image(systemName: "square.and.arrow.up")
-                                    .font(.system(size: 14))
-                                Text("Export Correction Data")
-                                    .font(.system(size: 14, weight: .medium))
-                            }
-                            .foregroundColor(.orange)
-                            .padding(.vertical, 8)
-                            .padding(.horizontal, 12)
-                            .background(Color.orange.opacity(0.1))
-                            .cornerRadius(8)
-                        }
-                        .padding(.top, 16)
+
                     }
                     
                     VStack(alignment: .leading, spacing: 12) {
@@ -256,6 +173,19 @@ struct SettingsView: View {
                                 subtitle: "Works without internet - caches addresses locally",
                                 iconColor: .orange
                             )
+                            
+                            Button(action: {
+                                HapticManager.lightImpact()
+                                SupabaseManager.shared.syncQueuedData()
+                            }) {
+                                SettingsRow(
+                                    icon: "arrow.clockwise",
+                                    title: "Sync Data",
+                                    subtitle: "Manually sync any queued data",
+                                    iconColor: .green
+                                )
+                            }
+                            .buttonStyle(PlainButtonStyle())
                             
                             SettingsRow(
                                 icon: "iphone.circle.fill",
@@ -355,17 +285,7 @@ struct SettingsView: View {
         .sheet(isPresented: $showingLogIssue) {
             LogIssueView(locationManager: locationManager)
         }
-        .sheet(isPresented: $showingExportSheet) {
-            ExportDataView(locationManager: locationManager)
-        }
-        .alert("Clear Feedback Data", isPresented: $showingClearDataAlert) {
-            Button("Cancel", role: .cancel) { }
-            Button("Clear All Data", role: .destructive) {
-                clearAllFeedbackData()
-            }
-        } message: {
-            Text("This will permanently delete all feedback data, floor corrections, and user issues. This action cannot be undone.")
-        }
+
     }
     
     private func openVertexLabsWebsite() {
@@ -406,10 +326,7 @@ struct SettingsView: View {
         }
     }
     
-    private func clearAllFeedbackData() {
-        locationManager.clearAllFeedbackData()
-        showingClearDataAlert = false
-    }
+
 }
 
 #Preview {

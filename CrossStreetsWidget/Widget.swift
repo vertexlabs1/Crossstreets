@@ -95,7 +95,7 @@ struct CrossStreetsWidgetEntryView: View {
     @Environment(\.widgetFamily) var family
 
     var body: some View {
-        Link(destination: URL(string: "crossstreets://")!) {
+        Link(destination: URL(string: "crossstreets://") ?? URL(string: "https://crossstreets.app")!) {
             ZStack {
                 RoundedRectangle(cornerRadius: 20)
                     .fill(LinearGradient(gradient: Gradient(colors: [Color.blue.opacity(0.18), Color(.systemBackground)]), startPoint: .top, endPoint: .bottom))

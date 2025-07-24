@@ -23,9 +23,7 @@ struct CurrentParkingView: View {
                             .onAppear {
                                 displayAddress = parking.address
                             }
-                            .onChange(of: parking.address) { oldValue, newValue in
-                                displayAddress = newValue
-                            }
+                            // Removed onChange to prevent continuous view rebuilding
                         
                         if let garageName = parking.garageName {
                             HStack(spacing: 4) {
@@ -64,11 +62,7 @@ struct CurrentParkingView: View {
                 .background(Color.blue.opacity(0.05))
                 .cornerRadius(10)
             }
-            .onReceive(locationManager.$parkedLocation) { location in
-                if let newAddress = location?.address {
-                    displayAddress = newAddress
-                }
-            }
+            // Removed onReceive to prevent continuous view rebuilding
         } else {
             EmptyView()
         }

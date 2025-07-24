@@ -5,26 +5,83 @@ import UIKit
 import UserNotifications
 import SwiftUI // Added for @AppStorage
 import Network // Added for NWPathMonitor
+import CoreMotion
 
 class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
-    private let locationManager = CLLocationManager()
-    @Published var currentLocation: CLLocation?
+    // MARK: - Properties
+    @Published var currentLocation: CLLocation? {
+        didSet {
+            // SIMPLE FIX: Only log significant location changes to prevent spam
+            if let newLocation = currentLocation,
+               let oldLocation = oldValue {
+                let distance = newLocation.distance(from: oldLocation)
+                if distance > 10 {
+                    print("📍 currentLocation: Updated (\(distance)m)")
+                }
+            } else if currentLocation != nil {
+                print("📍 currentLocation: First location set")
+            }
+        }
+    }
     @Published var parkedLocation: ParkingLocation?
-    @Published var authorizationStatus: CLAuthorizationStatus = .notDetermined
     @Published var isLocationEnabled = false
-    @Published var locationPermissionError: String? = nil
+    @Published var locationPermissionError: String?
     @Published var isDetectingParking = false
+    @Published var isOnline = true
+    @Published var detectedGarageInfo: GarageDetectionResult? = nil {
+        didSet {
+            print("🏢 detectedGarageInfo didSet triggered")
+            // Throttle updates: only publish if value changed and at least 1s since last update
+            let now = Date()
+            if let old = oldValue, let new = detectedGarageInfo, old == new, now.timeIntervalSince(lastGarageInfoUpdate) < 1.0 {
+                print("🏢 detectedGarageInfo: Throttling update (same value, too soon)")
+                // CRITICAL FIX: Don't set detectedGarageInfo = old as it creates infinite loop
+                // Instead, just return and keep the new value
+                return
+            }
+            lastGarageInfoUpdate = now
+            print("🏢 detectedGarageInfo: Allowing update")
+        }
+    }
+    private var lastGarageInfoUpdate: Date = .distantPast
+    @Published var authorizationStatus: CLAuthorizationStatus = .notDetermined
     
-    private var detectedGarageInfo: (Bool, String?)? = nil
+    // Throttle helpers
+    private var lastBarometricUpdate: Date = .distantPast
+    private var lastLocationUpdate: Date = .distantPast
     
-    // Local storage for garage floor corrections
-    private let correctionsKey = "garageFloorCorrections"
-    private let issuesKey = "userReportedIssues"
-    private let altitudeDataKey = "garageAltitudeData"
-    private var floorCorrections: [String: [String: Int]] = [:] // [garageName: [floor: count]]
-    private var userIssues: [UserIssue] = []
-    private var garageAltitudeData: [String: GarageAltitudeData] = [:] // [garageName: altitudeData]
+    // Location manager
+    private let locationManager = CLLocationManager()
     
+    // Altimeter for barometric pressure
+    private let altimeter = CMAltimeter()
+    @Published var barometricAltitude: Double? {
+        didSet {
+            // SIMPLE FIX: Only log significant changes to prevent spam
+            if let newValue = barometricAltitude,
+               let oldValue = oldValue {
+                let difference = abs(newValue - oldValue)
+                if difference > 1.0 { // Only log if altitude changed by more than 1 meter
+                    print("📊 barometricAltitude: Updated (\(difference)m)")
+                }
+            } else if barometricAltitude != nil {
+                print("📊 barometricAltitude: First reading set")
+            }
+        }
+    }
+    @Published var barometricPressure: Double?
+    
+    // Network monitor
+    // Network monitoring - REMOVED: Using shared network status from app level
+    
+    // Local storage keys
+    private let parkedLocationKey = "parkedLocation"
+    // Removed: correctionsKey, issuesKey, altitudeDataKey - now handled by Supabase
+    
+    // Data storage - only keep what's needed for current session
+    // Removed: floorCorrections, userIssues, garageAltitudeData - now handled by Supabase
+    
+    // Keep these structs for Supabase data transfer
     struct UserIssue: Codable {
         let id: UUID
         let timestamp: Date
@@ -49,6 +106,7 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
         let detectedFloor: String
         let actualFloor: String
         let altitude: Double
+        let altitudeSource: String // "barometric" or "gps"
         let gpsAccuracy: Double
         let barometricPressure: Double?
         let wasCorrect: Bool
@@ -59,16 +117,66 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     override init() {
         super.init()
         setupLocationManager()
-        loadParkedLocation()
-        loadFloorCorrections()
-        loadUserIssues()
-        loadAltitudeData()
+        // Network monitoring removed - using shared status from app level
+        setupAltimeter()
+        loadParkedLocation() // Keep this - needed for parked car location
+        // Removed: loadFloorCorrections() - now handled by Supabase
+        // Removed: loadUserIssues() - now handled by Supabase  
+        // Removed: loadAltitudeData() - now handled by Supabase
+    }
+    
+    deinit {
+        // Network monitoring removed - using shared status from app level
+        stopAltimeter()
     }
     
     private func setupLocationManager() {
         locationManager.delegate = self
         locationManager.desiredAccuracy = kCLLocationAccuracyNearestTenMeters
-        locationManager.distanceFilter = 25
+        locationManager.distanceFilter = 100 // CRITICAL FIX: Increased to prevent tiny movements from triggering updates
+        locationManager.allowsBackgroundLocationUpdates = false
+        locationManager.pausesLocationUpdatesAutomatically = true
+    }
+    
+    private func setupAltimeter() {
+        // Check if altimeter is available
+        guard CMAltimeter.isRelativeAltitudeAvailable() else {
+            print("⚠️ Barometric altimeter not available on this device")
+            return
+        }
+        
+        print("✅ Barometric altimeter available - starting monitoring")
+        startAltimeter()
+    }
+    
+    private func startAltimeter() {
+        guard CMAltimeter.isRelativeAltitudeAvailable() else { return }
+        
+        altimeter.startRelativeAltitudeUpdates(to: .main) { [weak self] data, error in
+            guard let data = data, error == nil else {
+                print("⚠️ Altimeter error: \(error?.localizedDescription ?? "Unknown error")")
+                return
+            }
+            
+            // FIX: Throttle updates to prevent excessive view rebuilds
+            DispatchQueue.main.async {
+                let now = Date()
+                guard now.timeIntervalSince(self?.lastBarometricUpdate ?? .distantPast) > 2.0 else { return }
+                
+                self?.barometricAltitude = data.relativeAltitude.doubleValue
+                self?.barometricPressure = data.pressure.doubleValue
+                self?.lastBarometricUpdate = now
+                
+                // Log significant changes for debugging
+                if let altitude = self?.barometricAltitude, abs(altitude) > 1.0 {
+                    print("📊 Barometric altitude: \(altitude)m, pressure: \(data.pressure.doubleValue) kPa")
+                }
+            }
+        }
+    }
+    
+    private func stopAltimeter() {
+        altimeter.stopRelativeAltitudeUpdates()
     }
     
     private func formatCoordinatesNicely(_ coordinate: CLLocationCoordinate2D) -> String {
@@ -80,6 +188,7 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     }
     
     private func getSmartAddress(for coordinate: CLLocationCoordinate2D, completion: @escaping (String) -> Void) {
+        print("🌍 getSmartAddress: Starting for coordinate \(coordinate)")
         let niceCoordinates = formatCoordinatesNicely(coordinate)
         
         // Start with a more user-friendly initial message
@@ -92,16 +201,19 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
         // Shorter timeout for better responsiveness
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
             if !hasCompleted {
+                print("🌍 getSmartAddress: Timeout reached, using coordinates")
                 hasCompleted = true
                 completion(niceCoordinates)
             }
         }
         
         geocoder.reverseGeocodeLocation(location) { [weak self] placemarks, error in
+            print("🌍 getSmartAddress: Geocoding completed, error: \(error?.localizedDescription ?? "none")")
             guard !hasCompleted else { return }
             hasCompleted = true
             var address = niceCoordinates
             if let placemark = placemarks?.first, error == nil {
+                print("🌍 getSmartAddress: Found placemark: \(placemark.name ?? "unnamed")")
                 if let name = placemark.name, !name.isEmpty {
                     address = name
                 } else if let thoroughfare = placemark.thoroughfare {
@@ -115,16 +227,21 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
                 }
                 self?.checkForNearbyStores(at: location) { nearbyStore in
                     if let store = nearbyStore {
+                        print("🌍 getSmartAddress: Found nearby store: \(store)")
                         completion("Near \(store)")
                     } else {
+                        print("🌍 getSmartAddress: Using address: \(address)")
                         completion(address)
                     }
                 }
             } else {
+                print("🌍 getSmartAddress: No placemark found, checking nearby stores")
                 self?.checkForNearbyStores(at: location) { nearbyStore in
                     if let store = nearbyStore {
+                        print("🌍 getSmartAddress: Found nearby store: \(store)")
                         completion("Near \(store)")
                     } else {
+                        print("🌍 getSmartAddress: Using coordinates: \(address)")
                         completion(address)
                     }
                 }
@@ -228,8 +345,18 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
         guard let location = locations.last else { return }
         DispatchQueue.main.async { [weak self] in
-            self?.currentLocation = location
-            self?.optimizeLocationAccuracy()
+            guard let self = self else { return }
+            
+            // SIMPLE FIX: Only update if location is significantly different
+            if let currentLocation = self.currentLocation {
+                let distance = location.distance(from: currentLocation)
+                if distance < 5.0 { // Only update if moved more than 5 meters
+                    return
+                }
+            }
+            
+            self.currentLocation = location
+            self.optimizeLocationAccuracy()
         }
     }
     
@@ -260,6 +387,8 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     
     func locationManager(_ manager: CLLocationManager, didChangeAuthorization status: CLAuthorizationStatus) {
         DispatchQueue.main.async {
+            self.authorizationStatus = status
+            
             switch status {
             case .authorizedWhenInUse, .authorizedAlways:
                 self.isLocationEnabled = true
@@ -279,137 +408,119 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     }
     
     func detectParkingType(completion: @escaping () -> Void = {}) {
-        print("🚗 Starting parking detection...")
-        print("🔍 DEBUG: Button pressed - detectParkingType called")
-        debugLocationStatus()
+        guard !isDetectingParking else { return }
+        
         isDetectingParking = true
+        let detectionStartTime = Date()
         
-        // Reduced global timeout for faster response
-        let globalTimeout = DispatchTime.now() + 6.0 // Reduced from 10s to 6s
+        print("🚗 Starting parking detection...")
+        PerformanceMonitor.shared.startAction("garage_detection")
         
-        DispatchQueue.main.asyncAfter(deadline: globalTimeout) { [weak self] in
+        // MUCH FASTER: Quick proximity check with 1.5s timeout
+        let quickTimeout = DispatchTime.now() + 1.5
+        
+        DispatchQueue.main.asyncAfter(deadline: quickTimeout) { [weak self] in
             guard let self = self, self.isDetectingParking else { return }
-            print("⚠️ Parking detection timed out globally")
+            print("⏱️ Quick garage check timed out - parking normally")
             self.isDetectingParking = false
             self.saveParkedLocation(floor: nil)
-            self.detectedGarageInfo = (false, nil)
+            self.detectedGarageInfo = GarageDetectionResult(isInGarage: false, garageName: nil)
+            
+            let detectionDuration = Date().timeIntervalSince(detectionStartTime)
+            PerformanceMonitor.shared.endAction("garage_detection", screen: "main", success: false, context: ["timeout": true])
+            PerformanceMonitor.shared.logGarageDetectionTime(detectionDuration, success: false)
             completion()
         }
         
         guard let currentLocation = currentLocation else {
-            print("❌ currentLocation is nil - this is the issue!")
+            print("❌ No current location available")
             isDetectingParking = false
+            self.saveParkedLocation(floor: nil)
+            self.detectedGarageInfo = GarageDetectionResult(isInGarage: false, garageName: nil)
             completion()
             return
         }
         
-        // Check network connectivity first
-        let isOnline = checkNetworkConnectivity()
-        
-        if !isOnline {
-            print("❌ No network connectivity - parking directly")
-            self.isDetectingParking = false
+        // QUICK PROXIMITY CHECK: Only search if we have good accuracy
+        guard currentLocation.horizontalAccuracy <= 20 else {
+            print("📍 Poor GPS accuracy (\(currentLocation.horizontalAccuracy)m) - parking normally")
+            isDetectingParking = false
             self.saveParkedLocation(floor: nil)
-            self.detectedGarageInfo = (false, nil)
+            self.detectedGarageInfo = GarageDetectionResult(isInGarage: false, garageName: nil)
             completion()
             return
         }
         
-        // Reduced detection timeout for faster response
-        let detectionTimeout = DispatchTime.now() + 4.0 // Reduced from 8s to 4s
-        
-        DispatchQueue.main.asyncAfter(deadline: detectionTimeout) { [weak self] in
-            guard let self = self, self.isDetectingParking else { return }
-            print("⏱️ Garage detection timed out, parking directly")
-            self.isDetectingParking = false
-            self.saveParkedLocation(floor: nil)
-            self.detectedGarageInfo = (false, nil)
-            completion()
-        }
-        
-        // Start garage detection with faster search
-        self.checkForParkingGarage(at: currentLocation) { [weak self] isInGarage, garageName in
+        // FAST GARAGE CHECK: Only look for very close, obvious garages
+        performQuickGarageCheck(at: currentLocation) { [weak self] isInGarage, garageName in
             guard let self = self, self.isDetectingParking else { return }
             
-            print("🏢 Garage detection result: \(isInGarage ? "Found" : "Not found") - \(garageName ?? "None")")
-            
             self.isDetectingParking = false
+            let detectionDuration = Date().timeIntervalSince(detectionStartTime)
+            
             if isInGarage {
-                self.detectedGarageInfo = (true, garageName)
-                self.sendGarageFloorNotification(garageName: garageName)
+                print("🏢 Quick check: Found garage '\(garageName ?? "Unknown")' - showing floor picker")
+                self.detectedGarageInfo = GarageDetectionResult(isInGarage: true, garageName: garageName)
+                PerformanceMonitor.shared.endAction("garage_detection", screen: "main", success: true, context: ["garage_name": garageName ?? "unknown"])
+                PerformanceMonitor.shared.logGarageDetectionTime(detectionDuration, success: true)
             } else {
-                // FALLBACK: Check if we're in a dense urban area that might have parking
-                let isUrbanArea = self.isInUrbanArea(at: currentLocation)
-                if isUrbanArea {
-                    print("🏙️ Urban area detected - offering floor selection as fallback")
-                    self.detectedGarageInfo = (true, "Urban Parking Area")
-                    self.sendGarageFloorNotification(garageName: "Urban Parking Area")
-                } else {
-                    self.saveParkedLocation(floor: nil)
-                    self.detectedGarageInfo = (false, nil)
-                }
+                print("🚗 Quick check: No obvious garage - parking normally")
+                self.saveParkedLocation(floor: nil)
+                self.detectedGarageInfo = GarageDetectionResult(isInGarage: false, garageName: nil)
+                PerformanceMonitor.shared.endAction("garage_detection", screen: "main", success: false, context: ["no_garage": true])
+                PerformanceMonitor.shared.logGarageDetectionTime(detectionDuration, success: false)
             }
             completion()
         }
     }
     
-    private func isInUrbanArea(at location: CLLocation) -> Bool {
-        // Simple heuristic: check if we're in a city with dense development
-        // This is a basic implementation - could be enhanced with more sophisticated urban detection
-        
-        // For now, we'll use a conservative approach:
-        // If we're in a location that has multiple nearby POIs, it's likely urban
+    private func checkForNearbyParking(at location: CLLocation) -> Bool {
+        // Quick check for nearby parking structures (within 100m)
         let searchRequest = MKLocalSearch.Request()
-        searchRequest.naturalLanguageQuery = "business"
+        searchRequest.naturalLanguageQuery = "parking garage"
         searchRequest.region = MKCoordinateRegion(
             center: location.coordinate,
-            latitudinalMeters: 200, // 200m radius
-            longitudinalMeters: 200
+            span: MKCoordinateSpan(latitudeDelta: 0.002, longitudeDelta: 0.002) // ~200m radius
         )
         
         let search = MKLocalSearch(request: searchRequest)
-        var isUrban = false
         let semaphore = DispatchSemaphore(value: 0)
+        var hasNearbyParking = false
         
         search.start { response, error in
-            if let response = response, response.mapItems.count >= 3 {
-                // If there are 3+ businesses in 200m radius, likely urban
-                isUrban = true
+            defer { semaphore.signal() }
+            
+            guard let response = response, error == nil else { return }
+            
+            for item in response.mapItems {
+                let distance = location.distance(from: item.placemark.location ?? CLLocation())
+                let name = item.name?.lowercased() ?? ""
+                
+                // Check for real parking structures within 100m
+                let isRealParking = (name.contains("garage") || name.contains("deck") || name.contains("structure")) && distance <= 150
+                
+                if isRealParking {
+                    hasNearbyParking = true
+                    break
+                }
             }
-            semaphore.signal()
         }
         
-        // Wait for a short time, default to false if timeout
-        _ = semaphore.wait(timeout: .now() + 2.0)
-        
-        return isUrban
+        // Wait for search to complete (with timeout)
+        _ = semaphore.wait(timeout: .now() + 1.0)
+        return hasNearbyParking
+    }
+    
+    private func isInUrbanArea(at location: CLLocation) -> Bool {
+        // Simplified urban detection without blocking the main thread
+        // For now, assume most locations are urban to avoid blocking
+        return true
     }
     
     private func checkNetworkConnectivity() -> Bool {
-        // More robust network check with timeout
-        let monitor = NWPathMonitor()
-        var isConnected = false
-        let semaphore = DispatchSemaphore(value: 0)
-        
-        monitor.pathUpdateHandler = { (path: NWPath) in
-            isConnected = path.status == .satisfied
-            semaphore.signal()
-        }
-        
-        let queue = DispatchQueue(label: "NetworkCheck")
-        monitor.start(queue: queue)
-        
-        // Wait for a short time to get the network status
-        let result = semaphore.wait(timeout: .now() + 1.0) // Reduced timeout to 1 second
-        monitor.cancel()
-        
-        if result == .timedOut {
-            print("⚠️ Network check timed out, assuming offline")
-            return false
-        }
-        
-        print("🌐 Network check completed: \(isConnected ? "Online" : "Offline")")
-        return isConnected
+        // Use the existing network monitor instead of creating a new one
+        // This avoids blocking the main thread
+        return isOnline
     }
     
     // MARK: - Performance Optimizations
@@ -441,7 +552,7 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     }
     
     private func checkForParkingGarage(at location: CLLocation, completion: @escaping (Bool, String?) -> Void) {
-        print("🔍 Starting garage search...")
+        print("🔍 Starting PRECISE garage detection...")
         
         // Add a flag to ensure completion is only called once
         var garageSearchCompleted = false
@@ -453,109 +564,167 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
             }
         }
         
-        // Reduced timeout for faster response
-        let searchTimeout = DispatchTime.now() + 3.0 // Reduced from 6s to 3s
+        // Shorter timeout for faster response
+        let searchTimeout = DispatchTime.now() + 2.5
         
-        performParkingSearch(at: location, query: "parking garage") { found, name in
-            print("🔍 'parking garage' search result: \(found ? "Found" : "Not found") - \(name ?? "None")")
-            if found {
-                completeOnce(true, name)
-            } else {
-                self.performParkingSearch(at: location, query: "parking") { found2, name2 in
-                    print("🔍 'parking' search result: \(found2 ? "Found" : "Not found") - \(name2 ?? "None")")
-                    if found2 {
-                        completeOnce(true, name2)
-                    } else {
-                        // Skip the third search for speed - just complete
-                        print("🔍 Skipping third search for speed")
-                        completeOnce(false, nil)
-                    }
-                }
-            }
+        // PRECISE GARAGE DETECTION: Only search for specific garage types
+        performPreciseGarageSearch(at: location) { found, name in
+            print("🔍 Precise garage search result: \(found ? "INSIDE" : "Outside") - \(name ?? "None")")
+            completeOnce(found, name)
         }
         
         // Fallback timeout
         DispatchQueue.main.asyncAfter(deadline: searchTimeout) {
-            print("⚠️ Garage search timed out, completing with no garage found")
+            print("⚠️ Precise garage search timed out")
             completeOnce(false, nil)
         }
     }
     
-    private func performParkingSearch(at location: CLLocation, query: String, completion: @escaping (Bool, String?) -> Void) {
-        print("🔍 Performing search for: '\(query)'")
-        performParkingSearchWithRetry(at: location, query: query, retryCount: 0, completion: completion)
-    }
-    
-    private func performParkingSearchWithRetry(at location: CLLocation, query: String, retryCount: Int, completion: @escaping (Bool, String?) -> Void) {
-        print("🔍 Search attempt \(retryCount + 1) for '\(query)'")
+    private func performQuickGarageCheck(at location: CLLocation, completion: @escaping (Bool, String?) -> Void) {
+        print("🔍 Performing QUICK garage check...")
+        
+        // Only search for very close, obvious garages
         let searchRequest = MKLocalSearch.Request()
-        searchRequest.naturalLanguageQuery = query
+        searchRequest.naturalLanguageQuery = "parking garage"
         searchRequest.region = MKCoordinateRegion(
             center: location.coordinate,
-            span: MKCoordinateSpan(latitudeDelta: 0.005, longitudeDelta: 0.005)
+            span: MKCoordinateSpan(latitudeDelta: 0.001, longitudeDelta: 0.001) // Very small search area (~100m)
         )
         
         let search = MKLocalSearch(request: searchRequest)
-        
-        // Reduced timeout for faster response
-        let searchTimeout = DispatchTime.now() + 2.0 // Reduced from 10s to 2s
-        print("⏱️ Search timeout set to 2s")
+        let searchTimeout = DispatchTime.now() + 1.0 // Very short timeout
         
         search.start { response, error in
             // Check timeout
             guard DispatchTime.now() <= searchTimeout else {
-                print("⚠️ Parking search timed out for query: \(query)")
+                print("⏱️ Quick garage check timed out")
                 completion(false, nil)
                 return
             }
             
             guard let response = response, error == nil else {
-                print("⚠️ Parking search failed for query '\(query)': \(error?.localizedDescription ?? "Unknown error")")
+                print("⚠️ Quick garage check failed: \(error?.localizedDescription ?? "Unknown error")")
                 completion(false, nil)
                 return
             }
             
-            print("🔍 Found \(response.mapItems.count) items for '\(query)'")
+            print("🔍 Found \(response.mapItems.count) potential structures")
             
-            // Debug: Log all found items for analysis
-            for (index, item) in response.mapItems.enumerated() {
-                let distance = location.distance(from: item.placemark.location ?? CLLocation())
-                let category = item.pointOfInterestCategory?.rawValue ?? "unknown"
-                print("🔍 Item \(index): '\(item.name ?? "unnamed")' at \(distance)m, category: \(category)")
-            }
-            
+            // CONSERVATIVE DETECTION: Only trigger for very obvious cases
             for item in response.mapItems {
                 let distance = location.distance(from: item.placemark.location ?? CLLocation())
                 let name = item.name?.lowercased() ?? ""
                 
-                // IMPROVED: More flexible garage detection
-                let isGarage = (distance <= 50) && // Increased from 30m to 50m
-                    (
-                        // Check for explicit garage keywords
-                        name.contains("garage") || 
-                        name.contains("structure") ||
-                        name.contains("deck") ||
-                        name.contains("lot") ||
-                        name.contains("parking") ||
-                        // Check if it's categorized as parking
-                        item.pointOfInterestCategory == .parking ||
-                        // Check for common parking facility patterns
-                        name.contains("park") ||
-                        name.contains("p&r") || // Park & Ride
-                        name.contains("commuter") ||
-                        // Check address patterns that suggest parking
-                        (item.placemark.thoroughfare?.lowercased().contains("parking") == true) ||
-                        (item.placemark.name?.lowercased().contains("parking") == true)
-                    )
+                // VERY CONSERVATIVE CRITERIA:
+                // 1. Must be a clear garage/structure name
+                let isClearGarage = name.contains("garage") || 
+                                   name.contains("deck") ||
+                                   (name.contains("parking") && (name.contains("structure") || name.contains("center")))
                 
-                if isGarage {
+                // 2. Must be very close (within 50m)
+                let isVeryClose = distance <= 50
+                
+                // 3. Must have excellent GPS accuracy
+                let hasExcellentAccuracy = location.horizontalAccuracy <= 10
+                
+                // 4. Optional: Check for altitude difference (inside multi-level)
+                let hasAltitudeData = location.verticalAccuracy > 0 && location.verticalAccuracy < 15
+                let isAtDifferentElevation = hasAltitudeData && abs(location.altitude - (item.placemark.location?.altitude ?? 0)) > 3
+                
+                if isClearGarage && isVeryClose && hasExcellentAccuracy {
                     let formattedName = self.formatGarageName(for: item)
-                    print("✅ Found garage: \(formattedName) at distance \(distance)m")
+                    print("✅ QUICK CHECK: Very likely in garage '\(formattedName)' at \(distance)m")
+                    if hasAltitudeData && isAtDifferentElevation {
+                        print("   - Elevation difference confirms multi-level garage")
+                    }
                     completion(true, formattedName)
                     return
+                } else {
+                    print("❌ Structure '\(item.name ?? "unnamed")' rejected:")
+                    print("   - Distance: \(distance)m (max 50m)")
+                    print("   - Accuracy: \(location.horizontalAccuracy)m (max 10m)")
+                    print("   - Is clear garage: \(isClearGarage)")
                 }
             }
-            print("❌ No suitable garage found for '\(query)'")
+            
+            print("❌ No obvious garage match - parking normally")
+            completion(false, nil)
+        }
+    }
+    
+    private func performPreciseGarageSearch(at location: CLLocation, completion: @escaping (Bool, String?) -> Void) {
+        print("🔍 Performing PRECISE garage search...")
+        
+        // Search specifically for garage structures
+        let searchRequest = MKLocalSearch.Request()
+        searchRequest.naturalLanguageQuery = "parking garage"
+        searchRequest.region = MKCoordinateRegion(
+            center: location.coordinate,
+            span: MKCoordinateSpan(latitudeDelta: 0.003, longitudeDelta: 0.003) // Smaller, more precise search area
+        )
+        
+        let search = MKLocalSearch(request: searchRequest)
+        let searchTimeout = DispatchTime.now() + 2.0
+        
+        search.start { response, error in
+            // Check timeout
+            guard DispatchTime.now() <= searchTimeout else {
+                print("⚠️ Precise garage search timed out")
+                completion(false, nil)
+                return
+            }
+            
+            guard let response = response, error == nil else {
+                print("⚠️ Precise garage search failed: \(error?.localizedDescription ?? "Unknown error")")
+                completion(false, nil)
+                return
+            }
+            
+            print("🔍 Found \(response.mapItems.count) potential garage structures")
+            
+            // PRECISE DETECTION: Only consider if user is actually INSIDE the garage
+            for item in response.mapItems {
+                let distance = location.distance(from: item.placemark.location ?? CLLocation())
+                let name = item.name?.lowercased() ?? ""
+                
+                // PRECISE CRITERIA: Must be a real garage structure AND very close
+                let isRealGarage = name.contains("garage") || 
+                                  name.contains("structure") ||
+                                  name.contains("deck") ||
+                                  (name.contains("parking") && (name.contains("garage") || name.contains("deck") || name.contains("structure")))
+                
+                // PRECISE DISTANCE: Must be within 100m AND have good GPS accuracy
+                let isCloseEnough = distance <= 150 // Increased from 100m to 150m
+                let hasGoodAccuracy = location.horizontalAccuracy <= 25 // Increased for outdoor use
+                
+                // PRECISE ALTITUDE: Check if user is at a different elevation (inside garage)
+                let hasAltitudeData = location.verticalAccuracy > 0 && location.verticalAccuracy < 20
+                let isAtDifferentElevation = hasAltitudeData && abs(location.altitude - (item.placemark.location?.altitude ?? 0)) > 5
+                
+                // PRECISE DETECTION: Only if all criteria are met
+                if isRealGarage && isCloseEnough && hasGoodAccuracy {
+                    let formattedName = self.formatGarageName(for: item)
+                    print("✅ PRECISE DETECTION: User NEAR garage '\(formattedName)' at \(distance)m (accuracy: \(location.horizontalAccuracy)m)")
+                    if hasAltitudeData {
+                        print("   - Altitude: \(location.altitude)m (accuracy: \(location.verticalAccuracy)m)")
+                        if isAtDifferentElevation {
+                            print("   - Elevation difference detected - likely inside multi-level garage")
+                        }
+                    }
+                    completion(true, formattedName)
+                    return
+                } else {
+                    print("❌ Garage '\(item.name ?? "unnamed")' rejected:")
+                    print("   - Distance: \(distance)m (max 100m)")
+                    print("   - Accuracy: \(location.horizontalAccuracy)m (max 25m)")
+                    print("   - Is real garage: \(isRealGarage)")
+                    if hasAltitudeData {
+                        print("   - Altitude: \(location.altitude)m (accuracy: \(location.verticalAccuracy)m)")
+                    }
+                }
+            }
+            
+            print("❌ No precise garage match found - user likely outside")
             completion(false, nil)
         }
     }
@@ -611,22 +780,29 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
         }
     }
     
-    func saveParkedLocation(floor: String?) {
-        guard let location = currentLocation else { return }
-        let garageName = detectedGarageInfo?.1
+    func saveParkedLocation(floor: String?, notes: String? = nil) {
+        guard let location = currentLocation else { 
+            print("❌ saveParkedLocation: No current location available")
+            return 
+        }
+        print("📍 saveParkedLocation: Starting with location \(location.coordinate)")
+        let garageName = detectedGarageInfo?.garageName
         let parkingLocation = ParkingLocation(
             id: UUID(),
             coordinate: location.coordinate,
             address: "Getting address...", // Better initial state
             floor: floor,
             timestamp: Date(),
-            garageName: garageName
+            garageName: garageName,
+            notes: notes
         )
         setParkedLocation(parkingLocation)
         HapticManager.mediumImpact()
         
         // Get the smart address with better loading state
+        print("📍 saveParkedLocation: Starting address resolution...")
         getSmartAddress(for: location.coordinate) { [weak self] address in
+            print("📍 saveParkedLocation: Address resolved: \(address)")
             DispatchQueue.main.async {
                 let updatedLocation = ParkingLocation(
                     id: parkingLocation.id,
@@ -634,10 +810,12 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
                     address: address,
                     floor: parkingLocation.floor,
                     timestamp: parkingLocation.timestamp,
-                    garageName: parkingLocation.garageName
+                    garageName: parkingLocation.garageName,
+                    notes: parkingLocation.notes
                 )
                 self?.setParkedLocation(updatedLocation)
                 self?.saveToUserDefaults(updatedLocation)
+                print("📍 saveParkedLocation: Updated parking location with address")
             }
         }
     }
@@ -650,20 +828,45 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
             address: location.address,
             floor: floor,
             timestamp: location.timestamp,
-            garageName: location.garageName
+            garageName: location.garageName,
+            notes: location.notes
+        )
+        setParkedLocation(updatedLocation)
+        saveToUserDefaults(updatedLocation)
+    }
+    
+    func updateNotes(_ notes: String?) {
+        guard let location = parkedLocation else { return }
+        let updatedLocation = ParkingLocation(
+            id: location.id,
+            coordinate: location.coordinate,
+            address: location.address,
+            floor: location.floor,
+            timestamp: location.timestamp,
+            garageName: location.garageName,
+            notes: notes
         )
         setParkedLocation(updatedLocation)
         saveToUserDefaults(updatedLocation)
     }
     
     func clearParkedLocation() {
+        print("🗑️ clearParkedLocation: Starting...")
         setParkedLocation(nil)
         UserDefaults.standard.removeObject(forKey: "parkedLocation")
-        let sharedDefaults = UserDefaults(suiteName: "group.CC3YTPPQQJ.crossstreets")
-        sharedDefaults?.removeObject(forKey: "parkedLocation")
+        
+        // Handle app group UserDefaults with error handling
+        if let sharedDefaults = UserDefaults(suiteName: "group.CC3YTPPQQJ.crossstreets") {
+            sharedDefaults.removeObject(forKey: "parkedLocation")
+            print("🗑️ clearParkedLocation: Cleared shared UserDefaults")
+        } else {
+            print("⚠️ clearParkedLocation: Could not access shared UserDefaults")
+        }
+        
         detectedGarageInfo = nil
         isDetectingParking = false
         HapticManager.lightImpact()
+        print("🗑️ clearParkedLocation: Completed")
     }
     
     func getDirectionsToParkedCar() {
@@ -678,8 +881,16 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     private func saveToUserDefaults(_ location: ParkingLocation) {
         if let encoded = try? JSONEncoder().encode(location) {
             UserDefaults.standard.set(encoded, forKey: "parkedLocation")
-            let sharedDefaults = UserDefaults(suiteName: "group.CC3YTPPQQJ.crossstreets")
-            sharedDefaults?.set(encoded, forKey: "parkedLocation")
+            
+            // Handle app group UserDefaults with error handling
+            if let sharedDefaults = UserDefaults(suiteName: "group.CC3YTPPQQJ.crossstreets") {
+                sharedDefaults.set(encoded, forKey: "parkedLocation")
+                print("💾 saveToUserDefaults: Saved to shared UserDefaults")
+            } else {
+                print("⚠️ saveToUserDefaults: Could not access shared UserDefaults")
+            }
+        } else {
+            print("❌ saveToUserDefaults: Failed to encode parking location")
         }
     }
     
@@ -704,99 +915,13 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     }
     
     // Local storage for garage floor corrections
-    private func loadFloorCorrections() {
-        if let data = UserDefaults.standard.data(forKey: correctionsKey),
-           let corrections = try? JSONDecoder().decode([String: [String: Int]].self, from: data) {
-            floorCorrections = corrections
-            print("📱 Loaded floor corrections for \(floorCorrections.count) garages")
-        } else {
-            print("📱 No floor corrections found in storage")
-        }
-    }
+    // Removed: loadFloorCorrections() - now handled by Supabase
+    // Removed: saveFloorCorrections() - now handled by Supabase
+    // Removed: loadUserIssues() - now handled by Supabase
+    // Removed: saveUserIssues() - now handled by Supabase
     
-    private func saveFloorCorrections() {
-        if let data = try? JSONEncoder().encode(floorCorrections) {
-            UserDefaults.standard.set(data, forKey: correctionsKey)
-            UserDefaults.standard.synchronize()
-            print("💾 Saved floor corrections: \(floorCorrections.count) garages")
-        } else {
-            print("❌ Failed to encode floor corrections")
-        }
-    }
-    
-    private func loadUserIssues() {
-        if let data = UserDefaults.standard.data(forKey: issuesKey),
-           let issues = try? JSONDecoder().decode([UserIssue].self, from: data) {
-            userIssues = issues
-            print("📱 Loaded \(userIssues.count) user issues")
-        } else {
-            print("📱 No user issues found in storage")
-        }
-    }
-    
-    private func saveUserIssues() {
-        if let data = try? JSONEncoder().encode(userIssues) {
-            UserDefaults.standard.set(data, forKey: issuesKey)
-            UserDefaults.standard.synchronize()
-            print("💾 Saved \(userIssues.count) user issues")
-        } else {
-            print("❌ Failed to encode user issues")
-        }
-    }
-    
-    func recordFloorCorrection(garageName: String, floor: String) {
-        if floorCorrections[garageName] == nil {
-            floorCorrections[garageName] = [:]
-        }
-        floorCorrections[garageName]?[floor, default: 0] += 1
-        saveFloorCorrections()
-    }
-    
-    func logGarageDetectionFailure(location: CLLocation, notes: String = "") {
-        let issue = UserIssue(
-            id: UUID(),
-            timestamp: Date(),
-            location: location.coordinate,
-            address: "Getting address...",
-            notes: "Garage detection failed: \(notes)",
-            issueType: "garage_detection_failure"
-        )
-        
-        userIssues.append(issue)
-        saveUserIssues()
-        
-        // Get address for context
-        let geocoder = CLGeocoder()
-        geocoder.reverseGeocodeLocation(location) { placemarks, error in
-            let address = placemarks?.first?.name ?? "Unknown location"
-            
-            DispatchQueue.main.async {
-                // Update the issue with the address
-                if let index = self.userIssues.firstIndex(where: { $0.id == issue.id }) {
-                    self.userIssues[index].address = address
-                    self.saveUserIssues()
-                }
-            }
-        }
-        
-        print("📊 Logged garage detection failure at \(location.coordinate)")
-    }
-    
-    func clearAllFeedbackData() {
-        // Clear floor corrections
-        floorCorrections.removeAll()
-        saveFloorCorrections()
-        
-        // Clear user issues
-        userIssues.removeAll()
-        saveUserIssues()
-        
-        // Clear altitude data
-        garageAltitudeData.removeAll()
-        saveAltitudeData()
-        
-        print("🗑️ Cleared all feedback data")
-    }
+    // Removed: recordFloorCorrection() - now handled by Supabase
+    // Removed: logGarageDetectionFailure() - now handled by Supabase
     
     func logUserIssue(notes: String, issueType: String = "general_issue") {
         guard let currentLocation = currentLocation else {
@@ -809,132 +934,76 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
         geocoder.reverseGeocodeLocation(currentLocation) { placemarks, error in
             let address = placemarks?.first?.name ?? "Unknown location"
             
-            let issue = UserIssue(
-                id: UUID(),
-                timestamp: Date(),
-                location: currentLocation.coordinate,
-                address: address,
-                notes: notes,
-                issueType: issueType
-            )
-            
             DispatchQueue.main.async {
-                self.userIssues.append(issue)
-                self.saveUserIssues()
                 print("✅ Logged user issue: \(notes)")
-            }
-        }
-    }
-    
-    func getFloorCorrectionCount(garageName: String, floor: String) -> Int {
-        return floorCorrections[garageName, default: [:]][floor, default: 0]
-    }
-    
-    func getGarageNames() -> [String] {
-        return Array(floorCorrections.keys).sorted()
-    }
-    
-    func getFloors(for garageName: String) -> [String] {
-        return Array(floorCorrections[garageName, default: [:]].keys).sorted()
-    }
-    
-    // Export correction data for analysis
-    func exportCorrectionData() -> String {
-        print("📊 Starting data export...")
-        print("📊 Floor corrections: \(floorCorrections.count) garages")
-        print("📊 User issues: \(userIssues.count) issues")
-        print("📊 Altitude data: \(garageAltitudeData.count) garages")
-        
-        var export = "CrossStreets Feedback Data Export\n"
-        export += "Generated: \(Date())\n"
-        export += "Device: \(UIDevice.current.name)\n\n"
-        
-        // Floor Corrections Section
-        export += "=== GARAGE FLOOR CORRECTIONS ===\n"
-        if floorCorrections.isEmpty {
-            export += "No floor corrections recorded yet.\n"
-        } else {
-            for (garageName, floors) in floorCorrections.sorted(by: { $0.key < $1.key }) {
-                export += "Garage: \(garageName)\n"
-                for (floor, count) in floors.sorted(by: { $0.key < $1.key }) {
-                    export += "  Floor \(floor): \(count) corrections\n"
+                
+                // Send to Supabase for real-time analytics
+                SupabaseManager.shared.logUserIssue(
+                    notes: notes,
+                    issueType: issueType,
+                    location: currentLocation.coordinate,
+                    address: address
+                ) { success in
+                    if success {
+                        print("✅ Supabase: Issue synced successfully")
+                    } else {
+                        print("⚠️ Supabase: Issue queued for later sync")
+                    }
                 }
-                export += "\n"
             }
         }
-        
-        // Altitude Data Section
-        export += "=== ALTITUDE-BASED FLOOR DETECTION DATA ===\n"
-        if garageAltitudeData.isEmpty {
-            export += "No altitude data recorded yet.\n"
-        } else {
-            for (garageName, altitudeData) in garageAltitudeData.sorted(by: { $0.key < $1.key }) {
-                export += "Garage: \(garageName)\n"
-                export += "  Total Corrections: \(altitudeData.totalCorrections)\n"
-                export += "  Last Updated: \(altitudeData.lastUpdated)\n"
-                export += "  GPS Accuracy: \(String(format: "%.1f", altitudeData.gpsAccuracy))m\n"
-                export += "  Barometric Available: \(altitudeData.barometricAvailable ? "Yes" : "No")\n"
-                export += "  Floor Elevations:\n"
-                for (floor, elevation) in altitudeData.floorElevations.sorted(by: { $0.key < $1.key }) {
-                    export += "    \(floor): \(String(format: "%.1f", elevation))m\n"
-                }
-                export += "\n"
-            }
-        }
-        
-        // User Issues Section
-        export += "=== USER REPORTED ISSUES ===\n"
-        if userIssues.isEmpty {
-            export += "No user issues reported yet.\n"
-        } else {
-            for issue in userIssues.sorted(by: { $0.timestamp > $1.timestamp }) {
-                export += "Issue ID: \(issue.id)\n"
-                export += "Date: \(issue.timestamp)\n"
-                export += "Type: \(issue.issueType)\n"
-                export += "Location: \(issue.location.latitude), \(issue.location.longitude)\n"
-                export += "Address: \(issue.address)\n"
-                export += "Notes: \(issue.notes)\n"
-                export += "---\n"
-            }
-        }
-        
-        // Summary Statistics
-        let stats = getCorrectionStats()
-        export += "\n=== SUMMARY STATISTICS ===\n"
-        export += "Total garages with corrections: \(stats.totalGarages)\n"
-        export += "Total floor corrections: \(stats.totalCorrections)\n"
-        export += "Total user issues reported: \(userIssues.count)\n"
-        export += "Total garages with altitude data: \(garageAltitudeData.count)\n"
-        
-        print("📊 Export completed: \(export.count) characters")
-        return export
     }
     
-    func getCorrectionStats() -> (totalGarages: Int, totalCorrections: Int) {
-        let totalGarages = floorCorrections.count
-        let totalCorrections = floorCorrections.values.flatMap { $0.values }.reduce(0, +)
-        return (totalGarages, totalCorrections)
-    }
+    // Removed: getFloorCorrectionCount() - now handled by Supabase
+    // Removed: getGarageNames() - now handled by Supabase
+    // Removed: getFloors(for:) - now handled by Supabase
     
-    func getUserIssuesCount() -> Int {
-        return userIssues.count
-    }
+
     
     // MARK: - Altitude-Based Floor Detection
     
     func detectFloorForGarage(_ garageName: String) -> String? {
         guard let location = currentLocation else { return nil }
         
-        // Get altitude with smart rounding
-        let altitude = roundAltitude(location.altitude)
+        // Use barometric altitude if available, otherwise fall back to GPS altitude
+        let altitude: Double
+        let altitudeSource: String
         
-        // Check if we have existing data for this garage
-        if let garageData = garageAltitudeData[garageName] {
-            return predictFloorFromAltitude(altitude, garageData: garageData)
+        if let barometricAltitude = barometricAltitude, let _ = self.barometricPressure {
+            altitude = roundAltitude(barometricAltitude)
+            altitudeSource = "barometric"
+        } else {
+            altitude = roundAltitude(location.altitude)
+            altitudeSource = "gps"
         }
         
+        // Validate altitude data quality
+        guard isValidAltitude(altitude, source: altitudeSource, location: location) else {
+            print("⚠️ Poor altitude data quality - skipping floor detection")
+            return nil
+        }
+        
+        // Check if we have existing data for this garage
+        // Removed: garageAltitudeData - now handled by Supabase
+        
         // No existing data, make educated guess based on common patterns
-        return makeInitialFloorGuess(altitude: altitude, garageName: garageName)
+        return makeInitialFloorGuess(altitude: altitude, garageName: garageName, source: altitudeSource)
+    }
+    
+    private func isValidAltitude(_ altitude: Double, source: String, location: CLLocation) -> Bool {
+        // Check for reasonable altitude values
+        guard altitude > -1000 && altitude < 10000 else {
+            print("⚠️ Altitude out of reasonable range: \(altitude)m")
+            return false
+        }
+        
+        // Check GPS accuracy if using GPS altitude
+        if source == "gps" && location.verticalAccuracy > 20 {
+            print("⚠️ Poor GPS vertical accuracy: \(location.verticalAccuracy)m")
+            return false
+        }
+        
+        return true
     }
     
     private func roundAltitude(_ altitude: Double) -> Double {
@@ -942,7 +1011,7 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
         return round(altitude / 3.0) * 3.0
     }
     
-    private func predictFloorFromAltitude(_ altitude: Double, garageData: GarageAltitudeData) -> String? {
+    private func predictFloorFromAltitude(_ altitude: Double, garageData: GarageAltitudeData, source: String) -> String? {
         var bestFloor: String?
         var smallestDifference = Double.infinity
         
@@ -954,11 +1023,14 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
             }
         }
         
-        // Only return prediction if difference is reasonable (within 6 meters)
-        return smallestDifference <= 6.0 ? bestFloor : nil
+        // More lenient threshold for barometric pressure (more accurate)
+        let threshold = source == "barometric" ? 4.5 : 6.0
+        
+        // Only return prediction if difference is reasonable
+        return smallestDifference <= threshold ? bestFloor : nil
     }
     
-    private func makeInitialFloorGuess(altitude: Double, garageName: String) -> String {
+    private func makeInitialFloorGuess(altitude: Double, garageName: String, source: String) -> String {
         // Common garage patterns
         let lowerCaseName = garageName.lowercased()
         
@@ -973,77 +1045,76 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
         } else if altitude < 10 {
             return "F1"
         } else {
-            return "F1"
+            // For higher altitudes, calculate floor based on typical floor height
+            let floorNumber = Int(round(altitude / 3.0)) // 3m per floor
+            return floorNumber > 0 ? "F\(floorNumber)" : "G"
         }
     }
     
     func logFloorDetectionResult(detectedFloor: String, actualFloor: String, garageName: String) {
         guard let location = currentLocation else { return }
         
-        let altitude = roundAltitude(location.altitude)
+        // Use barometric altitude if available, otherwise GPS
+        let altitude: Double
+        let altitudeSource: String
+        var barometricPressure: Double?
+        
+        if let barometricAltitude = barometricAltitude, let pressure = self.barometricPressure {
+            altitude = roundAltitude(barometricAltitude)
+            altitudeSource = "barometric"
+            barometricPressure = pressure
+        } else {
+            altitude = roundAltitude(location.altitude)
+            altitudeSource = "gps"
+            barometricPressure = nil
+        }
+        
         let wasCorrect = detectedFloor == actualFloor
         
-        // Create metadata
-        let metadata = FloorDetectionMetadata(
-            timestamp: Date(),
+        // Log floor detection accuracy for monitoring
+        PerformanceMonitor.shared.logFloorDetectionAccuracy(wasCorrect, altitudeSource: altitudeSource)
+        
+        // Log user action for floor selection
+        SupabaseManager.shared.logUserAction(
+            action: "floor_selection",
+            screen: "floor_picker",
+            success: true,
+            context: [
+                "detected_floor": detectedFloor,
+                "actual_floor": actualFloor,
+                "garage_name": garageName,
+                "was_correct": wasCorrect,
+                "altitude_source": altitudeSource
+            ]
+        ) { _ in }
+        
+        // Log for analysis
+        print("📊 Floor Detection: \(detectedFloor) → \(actualFloor) (\(wasCorrect ? "✅" : "❌")) Altitude: \(altitude)m (\(altitudeSource))")
+        
+        // Send to Supabase for real-time analytics
+        SupabaseManager.shared.logFloorCorrection(
             garageName: garageName,
             detectedFloor: detectedFloor,
             actualFloor: actualFloor,
             altitude: altitude,
-            gpsAccuracy: location.verticalAccuracy,
-            barometricPressure: nil, // TODO: Add barometric pressure if available
+            altitudeSource: altitudeSource,
+            barometricPressure: barometricPressure,
             wasCorrect: wasCorrect,
-            location: location.coordinate,
-            address: "Getting address..." // Will be updated later
-        )
-        
-        // Update garage altitude data
-        updateGarageAltitudeData(metadata: metadata)
-        
-        // Log for analysis
-        print("📊 Floor Detection: \(detectedFloor) → \(actualFloor) (\(wasCorrect ? "✅" : "❌")) Altitude: \(altitude)m")
-    }
-    
-    private func updateGarageAltitudeData(metadata: FloorDetectionMetadata) {
-        if garageAltitudeData[metadata.garageName] == nil {
-            garageAltitudeData[metadata.garageName] = GarageAltitudeData(
-                garageName: metadata.garageName,
-                floorElevations: [:],
-                totalCorrections: 0,
-                lastUpdated: Date(),
-                gpsAccuracy: metadata.gpsAccuracy,
-                barometricAvailable: metadata.barometricPressure != nil
-            )
-        }
-        
-        // Update floor elevation data
-        garageAltitudeData[metadata.garageName]?.floorElevations[metadata.actualFloor] = metadata.altitude
-        garageAltitudeData[metadata.garageName]?.totalCorrections += 1
-        garageAltitudeData[metadata.garageName]?.lastUpdated = Date()
-        
-        // Save updated data
-        saveAltitudeData()
-    }
-    
-    private func loadAltitudeData() {
-        if let data = UserDefaults.standard.data(forKey: altitudeDataKey),
-           let altitudeData = try? JSONDecoder().decode([String: GarageAltitudeData].self, from: data) {
-            garageAltitudeData = altitudeData
-            print("📱 Loaded altitude data for \(garageAltitudeData.count) garages")
-        } else {
-            print("📱 No altitude data found in storage")
+            location: location.coordinate
+        ) { success in
+            if success {
+                print("✅ Supabase: Floor correction synced successfully")
+            } else {
+                print("⚠️ Supabase: Floor correction queued for later sync")
+            }
         }
     }
     
-    private func saveAltitudeData() {
-        if let data = try? JSONEncoder().encode(garageAltitudeData) {
-            UserDefaults.standard.set(data, forKey: altitudeDataKey)
-            UserDefaults.standard.synchronize()
-            print("💾 Saved altitude data for \(garageAltitudeData.count) garages")
-        } else {
-            print("❌ Failed to encode altitude data")
-        }
-    }
+    // Removed: updateGarageAltitudeData() - now handled by Supabase
+    // Removed: loadAltitudeData() - now handled by Supabase
+    // Removed: saveAltitudeData() - now handled by Supabase
+    
+    // Network monitoring removed - using shared status from app level
     
     // Debug method to test location manager functionality
     func debugLocationStatus() {
@@ -1055,5 +1126,6 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
         print("📍 Location Services Enabled: \(CLLocationManager.locationServicesEnabled())")
         print("📍 Is Detecting Parking: \(isDetectingParking)")
         print("📍 Parked Location: \(parkedLocation?.address ?? "None")")
+        print("📡 Network Status: \(isOnline ? "Online" : "Offline")")
     }
 }

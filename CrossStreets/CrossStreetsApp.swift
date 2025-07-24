@@ -9,28 +9,39 @@ struct CrossStreetsApp: App {
     @State private var deepLinkDestination: String?
     @State private var networkCheckDelay = false
     
+    // Performance monitoring
+    private let appLaunchTime = Date()
+    
     // Network monitor
     private let networkMonitor = NWPathMonitor()
     private let networkQueue = DispatchQueue(label: "NetworkMonitor")
     
+    // Shared LocationManager instance
+    @StateObject private var locationManager = LocationManager()
+    
     var body: some Scene {
         WindowGroup {
             ZStack {
-                ContentView(deepLinkDestination: $deepLinkDestination)
-                    .opacity(showSplash ? 0 : 1)
-                    .animation(.easeIn(duration: 0.5), value: showSplash)
-                    .environment(\.isOnline, isOnline)
+                // Main ContentView - always present, never recreated
+                ContentView(locationManager: locationManager, deepLinkDestination: $deepLinkDestination)
                 
+                // Splash overlay - only shown when showSplash is true
                 if showSplash {
                     SplashView()
-                        .transition(.opacity.combined(with: .scale(scale: 1.1)))
+                        .transition(.opacity.combined(with: .scale(scale: 1.05)))
                         .zIndex(1)
                         .onAppear {
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-                                withAnimation(.easeOut(duration: 0.8)) {
+                            print("🎬 Splash screen appeared, will dismiss in 2 seconds")
+                            print("⏰ Scheduling splash dismissal timer...")
+                            // Start fade out after 2 seconds
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                                print("⏰ Splash screen timer fired, dismissing...")
+                                withAnimation(.easeInOut(duration: 0.8)) {
                                     showSplash = false
+                                    print("✅ Splash screen dismissed (showSplash = false)")
                                 }
                             }
+                            print("⏰ Splash dismissal timer scheduled successfully")
                         }
                 }
                 
@@ -58,7 +69,34 @@ struct CrossStreetsApp: App {
                 }
             }
             .onAppear {
+                print("🏠 App onAppear - showSplash: \(showSplash)")
                 startNetworkMonitoring()
+                trackAppLaunch()
+                
+                // Test Supabase connection
+                SupabaseManager.shared.testSupabaseConnection { success in
+                    if success {
+                        print("✅ Supabase: Connection verified")
+                    } else {
+                        print("❌ Supabase: Connection failed - check tables and API key")
+                    }
+                }
+                
+                // Fallback splash screen dismissal in case onAppear doesn't fire
+                print("🔄 Scheduling fallback splash dismissal...")
+                DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+                    print("🔄 Fallback timer fired, showSplash: \(showSplash)")
+                    if showSplash {
+                        print("🔄 Fallback splash dismissal triggered")
+                        withAnimation(.easeInOut(duration: 0.8)) {
+                            showSplash = false
+                            print("✅ Fallback splash screen dismissed")
+                        }
+                    } else {
+                        print("🔄 Fallback not needed - splash already dismissed")
+                    }
+                }
+                print("🔄 Fallback splash dismissal scheduled successfully")
             }
             .onDisappear {
                 stopNetworkMonitoring()
@@ -83,41 +121,47 @@ struct CrossStreetsApp: App {
         networkMonitor.pathUpdateHandler = { path in
             DispatchQueue.main.async {
                 let wasOnline = self.isOnline
-                let newOnlineStatus = path.status == .satisfied
+                self.isOnline = path.status == .satisfied
                 
-                // Only update if status actually changed
-                if self.isOnline != newOnlineStatus {
-                    self.isOnline = newOnlineStatus
+                // Only log if status actually changed
+                if wasOnline != self.isOnline {
+                    print("🌐 Network status: \(self.isOnline ? "Online" : "Offline")")
                     
-                    // Add delay before showing offline indicator to prevent false positives
-                    if !newOnlineStatus {
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                            if !self.isOnline {
-                                self.networkCheckDelay = true
-                            }
-                        }
-                    } else {
-                        // Immediately hide offline indicator when back online
-                        self.networkCheckDelay = false
-                    }
+                    // Update shared managers
+                    SupabaseManager.shared.isOnline = self.isOnline
                     
-                    // Show offline alert when connection is lost
-                    if wasOnline && !newOnlineStatus {
-                        self.showOfflineAlert = true
-                        
-                        // Auto-hide after 3 seconds
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
-                            self.showOfflineAlert = false
-                        }
+                    // Auto-sync queued data when coming back online
+                    if self.isOnline && !wasOnline {
+                        print("🔄 Auto-syncing queued data...")
+                        SupabaseManager.shared.syncQueuedData()
                     }
                 }
             }
         }
         networkMonitor.start(queue: networkQueue)
+        
+        // Reduce delay for better responsiveness
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            self.networkCheckDelay = true
+        }
     }
     
     private func stopNetworkMonitoring() {
         networkMonitor.cancel()
+    }
+    
+    private func trackAppLaunch() {
+        let launchDuration = Date().timeIntervalSince(appLaunchTime)
+        PerformanceMonitor.shared.logAppLaunchTime(launchDuration)
+        
+        // Log user action for app launch
+        SupabaseManager.shared.logUserAction(
+            action: "app_launch",
+            screen: "splash",
+            success: true,
+            duration: launchDuration,
+            context: ["splash_duration": 2.0]
+        ) { _ in }
     }
 }
 

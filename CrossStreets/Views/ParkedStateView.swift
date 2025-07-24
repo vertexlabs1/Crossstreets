@@ -5,6 +5,7 @@ struct ParkedStateView: View {
     @Binding var showingFloorPicker: Bool
     @Binding var detectedGarageName: String?
     @State private var displayAddress: String = ""
+    @State private var showingNotesEditor: Bool = false
     
     var body: some View {
         guard let parkedLocation = locationManager.parkedLocation else {
@@ -27,11 +28,24 @@ struct ParkedStateView: View {
                         .onAppear {
                             displayAddress = parkedLocation.address
                         }
-                        .onChange(of: parkedLocation.address) { oldValue, newAddress in
-                            Task { @MainActor in
-                                displayAddress = newAddress
-                            }
+                        .onChange(of: parkedLocation.address) { _, newAddress in
+                            displayAddress = newAddress
                         }
+                    
+                    // Show notes if they exist
+                    if let notes = parkedLocation.notes, !notes.isEmpty {
+                        HStack(spacing: 6) {
+                            Image(systemName: "note.text")
+                                .font(.system(size: 12))
+                                .foregroundColor(.secondary)
+                            Text(notes)
+                                .font(.system(size: 14))
+                                .foregroundColor(.secondary)
+                                .multilineTextAlignment(.leading)
+                                .lineLimit(2)
+                        }
+                        .padding(.top, 2)
+                    }
                     
                     HStack(spacing: 12) {
                         if let garageName = parkedLocation.garageName {
@@ -52,6 +66,8 @@ struct ParkedStateView: View {
                                     .foregroundColor(.primary)
                                 
                                 Button(action: {
+                                    // Prevent feedback loop: Only show if not already showing
+                                    guard !showingFloorPicker else { return }
                                     Task { @MainActor in
                                         detectedGarageName = parkedLocation.garageName
                                         withAnimation {
@@ -73,6 +89,28 @@ struct ParkedStateView: View {
                         Spacer()
                         
                         VStack(alignment: .trailing, spacing: 2) {
+                            HStack {
+                                Spacer()
+                                
+                                // Small "Add Notes" icon button
+                                Button(action: {
+                                    HapticManager.lightImpact()
+                                    Task { @MainActor in
+                                        withAnimation {
+                                            showingNotesEditor = true
+                                        }
+                                    }
+                                }) {
+                                    Image(systemName: "note.text")
+                                        .font(.system(size: 14))
+                                        .foregroundColor(.blue)
+                                        .padding(6)
+                                        .background(Color.blue.opacity(0.1))
+                                        .clipShape(Circle())
+                                }
+                                .buttonStyle(PlainButtonStyle())
+                            }
+                            
                             Text(DateHelper.timeAgo(from: parkedLocation.timestamp))
                                 .font(.system(size: 13))
                                 .foregroundColor(.secondary)
@@ -132,12 +170,14 @@ struct ParkedStateView: View {
             }
             .padding(.horizontal, 20)
             .padding(.bottom, 10)
-            .onReceive(locationManager.$parkedLocation) { location in
-                if let newAddress = location?.address {
-                    Task { @MainActor in
-                        displayAddress = newAddress
-                    }
-                }
+            // Removed onReceive to prevent continuous view rebuilding
+            .sheet(isPresented: $showingNotesEditor) {
+                NotesEditorView(
+                    showingNotesEditor: $showingNotesEditor,
+                    showingFloorPicker: $showingFloorPicker,
+                    detectedGarageName: $detectedGarageName,
+                    locationManager: locationManager
+                )
             }
         )
     }

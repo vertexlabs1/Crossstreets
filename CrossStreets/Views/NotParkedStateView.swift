@@ -20,6 +20,11 @@ struct NotParkedStateView: View {
             }
             
             Button(action: {
+                // Prevent feedback loop: Only trigger if not already detecting
+                guard !locationManager.isDetectingParking else { return }
+                // Start performance monitoring
+                PerformanceMonitor.shared.startAction("park_here_button")
+                
                 // Add immediate visual feedback
                 print("🔍 DEBUG: Park Here button pressed!")
                 isButtonPressed = true
@@ -27,7 +32,7 @@ struct NotParkedStateView: View {
                 HapticManager.lightImpact()
                 
                 // Reset button state after a short delay
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
                     isButtonPressed = false
                 }
                 
@@ -35,8 +40,11 @@ struct NotParkedStateView: View {
                 print("🔍 DEBUG: About to call locationManager.detectParkingType()")
                 locationManager.detectParkingType()
                 
+                // End performance monitoring after detection starts
+                PerformanceMonitor.shared.endAction("park_here_button", screen: "main", success: true, context: ["action": "started_detection"])
+                
                 // Check if detection completed without finding a garage
-                DispatchQueue.main.asyncAfter(deadline: .now() + 7.0) {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
                     if !locationManager.isDetectingParking && detectedGarageName == nil {
                         hasCompletedDetection = true
                     }
@@ -92,12 +100,11 @@ struct NotParkedStateView: View {
         .alert("Report Detection Issue", isPresented: $showReportIssue) {
             Button("Cancel", role: .cancel) { }
             Button("Report") {
-                if let location = locationManager.currentLocation {
-                    locationManager.logGarageDetectionFailure(
-                        location: location,
-                        notes: "User reported garage detection failed"
-                    )
-                }
+                // Log the garage detection failure using Supabase
+                locationManager.logUserIssue(
+                    notes: "User reported garage detection failed",
+                    issueType: "garage_detection_failure"
+                )
             }
         } message: {
             Text("Help us improve garage detection by reporting this issue. Your location data will be used to enhance the detection algorithm.")

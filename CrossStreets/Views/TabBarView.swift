@@ -2,6 +2,8 @@ import SwiftUI
 
 struct TabBarView: View {
     @Binding var selectedTab: Int
+    @Binding var showHistorySheet: Bool
+    @Binding var showSettingsSheet: Bool
     
     var body: some View {
         HStack(spacing: 0) {
@@ -25,6 +27,7 @@ struct TabBarView: View {
             
             Button(action: {
                 selectedTab = 1
+                showHistorySheet = true
                 HapticManager.lightImpact()
             }) {
                 VStack(spacing: 4) {
@@ -43,6 +46,7 @@ struct TabBarView: View {
             
             Button(action: {
                 selectedTab = 2
+                showSettingsSheet = true
                 HapticManager.lightImpact()
             }) {
                 VStack(spacing: 4) {
@@ -65,5 +69,9 @@ struct TabBarView: View {
 }
 
 #Preview {
-    TabBarView(selectedTab: .constant(0))
+    TabBarView(
+        selectedTab: .constant(0),
+        showHistorySheet: .constant(false),
+        showSettingsSheet: .constant(false)
+    )
 }
