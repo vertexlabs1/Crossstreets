@@ -10,6 +10,20 @@ class SupabaseManager: ObservableObject {
     private let baseURL = "https://iravqhplqvdjetpvnlmo.supabase.co"
     // Load API key from Info.plist
     private let apiKey: String = {
+        #if DEBUG
+        print("🔍 Debug: Checking Bundle.main.infoDictionary for SupabaseAPIKey")
+        if let infoDict = Bundle.main.infoDictionary {
+            print("🔍 Debug: Bundle info dictionary keys: \(infoDict.keys.sorted())")
+            if let key = infoDict["SupabaseAPIKey"] as? String {
+                print("🔍 Debug: Found SupabaseAPIKey in bundle: \(key.prefix(30))... (length: \(key.count))")
+            } else {
+                print("🔍 Debug: SupabaseAPIKey not found or not a string in bundle")
+            }
+        } else {
+            print("🔍 Debug: Bundle.main.infoDictionary is nil")
+        }
+        #endif
+        
         guard let key = Bundle.main.infoDictionary?["SupabaseAPIKey"] as? String else {
             fatalError("SupabaseAPIKey not found in Info.plist. Please add it securely.")
         }
