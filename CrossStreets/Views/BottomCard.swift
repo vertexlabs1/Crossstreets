@@ -38,6 +38,12 @@ struct BottomCard: View {
         .gesture(
             DragGesture(minimumDistance: 20) // Require minimum distance to start
                 .onEnded { value in
+                    // Only allow gesture if there's a parked location
+                    guard locationManager.parkedLocation != nil else {
+                        print("❌ Cannot show parking details via gesture - no parked location")
+                        return
+                    }
+                    
                     // Validate translation values to prevent NaN
                     let translationHeight = value.translation.height.isFinite ? value.translation.height : 0
                     let velocity = value.predictedEndTranslation.height - value.translation.height
@@ -50,14 +56,21 @@ struct BottomCard: View {
                 }
         )
         .onTapGesture {
-            showingParkingDetails = true
+            if locationManager.parkedLocation != nil {
+                showingParkingDetails = true
+            } else {
+                print("❌ Cannot show parking details - no parked location")
+            }
         }
         .sheet(isPresented: $showingParkingDetails) {
             if let parking = locationManager.parkedLocation {
+                print("📱 Presenting ParkingDetailsSheet with parking: \(parking)")
                 ParkingDetailsSheet(locationManager: locationManager, parking: parking)
                     .presentationDetents([.large])
                     .presentationDragIndicator(.visible)
                     .presentationCornerRadius(20)
+            } else {
+                print("❌ ParkingDetailsSheet: No parked location available")
             }
         }
     }

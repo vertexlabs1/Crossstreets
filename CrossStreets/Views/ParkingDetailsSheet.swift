@@ -151,6 +151,7 @@ struct ParkingDetailsSheet: View {
                         prepareShareContent()
                         showingShareSheet = true
                     }
+                    .disabled(parking.address.isEmpty)
                 }
                 ToolbarItemGroup(placement: .keyboard) {
                     Spacer()
@@ -191,6 +192,15 @@ struct ParkingDetailsSheet: View {
     }
     
     private func prepareShareContent() {
+        print("📤 Preparing share content for parking: \(parking)")
+        
+        // Validate parking data
+        guard !parking.address.isEmpty else {
+            print("❌ Share failed: Empty address")
+            shareText = "Unable to share location - address not available"
+            return
+        }
+        
         let locationText: String
         if let garageName = parking.garageName {
             if let floor = parking.floor {
@@ -205,6 +215,7 @@ struct ParkingDetailsSheet: View {
         let directionsLink = "\n\nGet directions: maps://?q=\(parking.coordinate.latitude),\(parking.coordinate.longitude)"
         
         shareText = locationText + directionsLink
+        print("📤 Share text prepared: \(shareText)")
     }
 }
 
