@@ -148,7 +148,9 @@ struct ParkingDetailsSheet: View {
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Share") {
+                        print("📤 Share button pressed")
                         prepareShareContent()
+                        print("📤 About to show share sheet with text: '\(shareText)'")
                         showingShareSheet = true
                     }
                     .disabled(parking.address.isEmpty)
@@ -162,6 +164,13 @@ struct ParkingDetailsSheet: View {
             }
         }
         .onAppear {
+            print("📱 ParkingDetailsSheet appeared with parking: \(parking)")
+            print("📱 Parking data on appear:")
+            print("   - Address: '\(parking.address)'")
+            print("   - Garage: \(parking.garageName ?? "nil")")
+            print("   - Floor: \(parking.floor ?? "nil")")
+            print("   - Notes: \(parking.notes ?? "nil")")
+            
             notes = parking.notes ?? ""
             // Load photos asynchronously to prevent blocking
             DispatchQueue.global(qos: .userInitiated).async {
@@ -193,6 +202,12 @@ struct ParkingDetailsSheet: View {
     
     private func prepareShareContent() {
         print("📤 Preparing share content for parking: \(parking)")
+        print("📤 Parking details:")
+        print("   - Address: '\(parking.address)'")
+        print("   - Garage: \(parking.garageName ?? "nil")")
+        print("   - Floor: \(parking.floor ?? "nil")")
+        print("   - Coordinates: \(parking.coordinate.latitude), \(parking.coordinate.longitude)")
+        print("   - Timestamp: \(parking.timestamp)")
         
         // Validate parking data
         guard !parking.address.isEmpty else {
@@ -215,7 +230,7 @@ struct ParkingDetailsSheet: View {
         let directionsLink = "\n\nGet directions: maps://?q=\(parking.coordinate.latitude),\(parking.coordinate.longitude)"
         
         shareText = locationText + directionsLink
-        print("📤 Share text prepared: \(shareText)")
+        print("📤 Share text prepared: '\(shareText)'")
     }
 }
 
@@ -260,6 +275,10 @@ struct ShareSheet: UIViewControllerRepresentable {
     let activityItems: [Any]
     
     func makeUIViewController(context: Context) -> UIActivityViewController {
+        print("📤 ShareSheet: Creating UIActivityViewController with \(activityItems.count) items")
+        for (index, item) in activityItems.enumerated() {
+            print("📤 ShareSheet: Item \(index): '\(item)'")
+        }
         let controller = UIActivityViewController(activityItems: activityItems, applicationActivities: nil)
         return controller
     }
