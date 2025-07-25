@@ -44,6 +44,20 @@ CREATE TABLE IF NOT EXISTS user_actions (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- User Issues Table
+CREATE TABLE IF NOT EXISTS user_issues (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    user_id UUID REFERENCES auth.users(id), -- NULL for anonymous users
+    issue_type TEXT NOT NULL,
+    notes TEXT,
+    latitude DOUBLE PRECISION NOT NULL,
+    longitude DOUBLE PRECISION NOT NULL,
+    address TEXT,
+    device_info JSONB DEFAULT '{}',
+    app_version TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
 -- Indexes for performance
 CREATE INDEX IF NOT EXISTS idx_performance_metrics_metric_name ON performance_metrics(metric_name);
 CREATE INDEX IF NOT EXISTS idx_performance_metrics_created_at ON performance_metrics(created_at);
@@ -52,11 +66,14 @@ CREATE INDEX IF NOT EXISTS idx_error_logs_created_at ON error_logs(created_at);
 CREATE INDEX IF NOT EXISTS idx_user_actions_action ON user_actions(action);
 CREATE INDEX IF NOT EXISTS idx_user_actions_screen ON user_actions(screen);
 CREATE INDEX IF NOT EXISTS idx_user_actions_created_at ON user_actions(created_at);
+CREATE INDEX IF NOT EXISTS idx_user_issues_issue_type ON user_issues(issue_type);
+CREATE INDEX IF NOT EXISTS idx_user_issues_created_at ON user_issues(created_at);
 
 -- Enable Row Level Security (RLS)
 ALTER TABLE performance_metrics ENABLE ROW LEVEL SECURITY;
 ALTER TABLE error_logs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE user_actions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE user_issues ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policies for anonymous inserts
 CREATE POLICY "Allow anonymous performance metrics" ON performance_metrics
@@ -66,6 +83,9 @@ CREATE POLICY "Allow anonymous error logs" ON error_logs
     FOR INSERT WITH CHECK (user_id IS NULL);
 
 CREATE POLICY "Allow anonymous user actions" ON user_actions
+    FOR INSERT WITH CHECK (user_id IS NULL);
+
+CREATE POLICY "Allow anonymous user issues" ON user_issues
     FOR INSERT WITH CHECK (user_id IS NULL);
 
 -- RLS Policies for authenticated users
@@ -78,6 +98,9 @@ CREATE POLICY "Allow authenticated error logs" ON error_logs
 CREATE POLICY "Allow authenticated user actions" ON user_actions
     FOR INSERT WITH CHECK (auth.uid() = user_id);
 
+CREATE POLICY "Allow authenticated user issues" ON user_issues
+    FOR INSERT WITH CHECK (auth.uid() = user_id);
+
 -- Service role read access for analytics
 CREATE POLICY "Allow service role read access" ON performance_metrics
     FOR SELECT USING (auth.role() = 'service_role');
@@ -86,6 +109,9 @@ CREATE POLICY "Allow service role read access" ON error_logs
     FOR SELECT USING (auth.role() = 'service_role');
 
 CREATE POLICY "Allow service role read access" ON user_actions
+    FOR SELECT USING (auth.role() = 'service_role');
+
+CREATE POLICY "Allow service role read access" ON user_issues
     FOR SELECT USING (auth.role() = 'service_role');
 
 -- Analytics Views
