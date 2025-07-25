@@ -20,6 +20,7 @@ struct CurrentParkingView: View {
                         Text(displayAddress.isEmpty ? "Locating..." : displayAddress)
                             .font(.system(size: 16, weight: .medium))
                             .foregroundColor(.primary)
+                            .lineLimit(2)
                             .onAppear {
                                 displayAddress = parking.address
                             }
