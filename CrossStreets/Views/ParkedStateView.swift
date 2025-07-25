@@ -92,6 +92,7 @@ struct ParkedStateView: View {
                                 Text(garageName)
                                     .font(.system(size: 14, weight: .medium))
                                     .foregroundColor(.blue)
+                                    .lineLimit(1)
                             }
                         }
                         

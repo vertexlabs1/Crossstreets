@@ -31,6 +31,7 @@ struct CurrentParkingView: View {
                                     .font(.system(size: 11))
                                 Text(garageName)
                                     .font(.system(size: 14))
+                                    .lineLimit(1)
                                 if let floor = parking.floor {
                                     Text("• \(floor)")
                                         .font(.system(size: 14, weight: .medium))
