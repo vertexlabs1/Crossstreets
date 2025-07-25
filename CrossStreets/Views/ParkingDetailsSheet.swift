@@ -8,8 +8,6 @@ struct ParkingDetailsSheet: View {
     @State private var notes: String = ""
     @State private var selectedPhotos: [PhotosPickerItem] = []
     @State private var parkingPhotos: [UIImage] = []
-    @State private var showingCamera = false
-    @State private var showingImagePicker = false
     
     var body: some View {
         NavigationView {
@@ -89,37 +87,13 @@ struct ParkingDetailsSheet: View {
                             }
                             
                             if parkingPhotos.isEmpty {
-                                HStack(spacing: 12) {
-                                    Button(action: {
-                                        HapticManager.lightImpact()
-                                        showingCamera = true
-                                    }) {
-                                        HStack {
-                                            Image(systemName: "camera")
-                                            Text("Capture Photo")
-                                        }
-                                        .foregroundColor(.blue)
-                                        .padding()
-                                        .frame(maxWidth: .infinity)
-                                        .background(Color.blue.opacity(0.1))
-                                        .cornerRadius(8)
-                                    }
-                                    
-                                    Button(action: {
-                                        HapticManager.lightImpact()
-                                        showingImagePicker = true
-                                    }) {
-                                        HStack {
-                                            Image(systemName: "photo.on.rectangle")
-                                            Text("Choose Photo")
-                                        }
-                                        .foregroundColor(.blue)
-                                        .padding()
-                                        .frame(maxWidth: .infinity)
-                                        .background(Color.blue.opacity(0.1))
-                                        .cornerRadius(8)
-                                    }
-                                }
+                                Text("Tap the + button to add photos of your parking spot")
+                                    .font(.subheadline)
+                                    .foregroundColor(.secondary)
+                                    .padding()
+                                    .frame(maxWidth: .infinity)
+                                    .background(Color.gray.opacity(0.1))
+                                    .cornerRadius(8)
                             } else {
                                 ScrollView(.horizontal, showsIndicators: false) {
                                     HStack(spacing: 12) {
@@ -208,25 +182,6 @@ struct ParkingDetailsSheet: View {
                 }
             }
         }
-        .sheet(isPresented: $showingCamera) {
-            CameraView { image in
-                if let image = image {
-                    parkingPhotos.append(image)
-                    HapticManager.lightImpact()
-                }
-            }
-        }
-        .sheet(isPresented: $showingImagePicker) {
-            ImagePicker(selectedImage: Binding(
-                get: { nil },
-                set: { image in
-                    if let image = image {
-                        parkingPhotos.append(image)
-                        HapticManager.lightImpact()
-                    }
-                }
-            ))
-        }
     }
     
     private func saveChanges() {
@@ -261,82 +216,6 @@ struct ParkingDetailsSheet: View {
         if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
            let window = windowScene.windows.first {
             window.rootViewController?.present(activityVC, animated: true)
-        }
-    }
-}
-
-// Camera view for capturing photos
-struct CameraView: UIViewControllerRepresentable {
-    let completion: (UIImage?) -> Void
-    
-    func makeUIViewController(context: Context) -> UIImagePickerController {
-        let picker = UIImagePickerController()
-        picker.delegate = context.coordinator
-        picker.sourceType = .camera
-        return picker
-    }
-    
-    func updateUIViewController(_ uiViewController: UIImagePickerController, context: Context) {}
-    
-    func makeCoordinator() -> Coordinator {
-        Coordinator(completion: completion)
-    }
-    
-    class Coordinator: NSObject, UIImagePickerControllerDelegate, UINavigationControllerDelegate {
-        let completion: (UIImage?) -> Void
-        
-        init(completion: @escaping (UIImage?) -> Void) {
-            self.completion = completion
-        }
-        
-        func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey : Any]) {
-            let image = info[.originalImage] as? UIImage
-            picker.dismiss(animated: true) {
-                self.completion(image)
-            }
-        }
-        
-        func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
-            picker.dismiss(animated: true) {
-                self.completion(nil)
-            }
-        }
-    }
-}
-
-// Image picker for choosing existing photos
-struct ImagePicker: UIViewControllerRepresentable {
-    @Binding var selectedImage: UIImage?
-    
-    func makeUIViewController(context: Context) -> UIImagePickerController {
-        let picker = UIImagePickerController()
-        picker.delegate = context.coordinator
-        picker.sourceType = .photoLibrary
-        return picker
-    }
-    
-    func updateUIViewController(_ uiViewController: UIImagePickerController, context: Context) {}
-    
-    func makeCoordinator() -> Coordinator {
-        Coordinator(self)
-    }
-    
-    class Coordinator: NSObject, UIImagePickerControllerDelegate, UINavigationControllerDelegate {
-        let parent: ImagePicker
-        
-        init(_ parent: ImagePicker) {
-            self.parent = parent
-        }
-        
-        func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey : Any]) {
-            if let image = info[.originalImage] as? UIImage {
-                parent.selectedImage = image
-            }
-            picker.dismiss(animated: true)
-        }
-        
-        func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
-            picker.dismiss(animated: true)
         }
     }
 }
