@@ -25,7 +25,6 @@ struct CrossStreetsApp: App {
                 // Splash overlay - always present but animated
                 SplashView()
                     .opacity(showSplash ? 1 : 0)
-                    .scaleEffect(showSplash ? 1 : 1.1)
                     .animation(.easeInOut(duration: 1.2), value: showSplash)
                     .zIndex(1)
                     .onAppear {
