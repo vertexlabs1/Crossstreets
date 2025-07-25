@@ -8,9 +8,13 @@ class SupabaseManager: ObservableObject {
     
     // Supabase configuration
     private let baseURL = "https://iravqhplqvdjetpvnlmo.supabase.co"
-    // TODO: Update this API key with the current "anon public" key from your Supabase dashboard
-    // Go to: Supabase Dashboard > Settings > API > Copy "anon public" key
-    private let apiKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlyYXZxaHBscXZkamV0cHZubG1vIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTMzODA2OTUsImV4cCI6MjA2ODk1NjY5NX0.Gm5wRCvbtc-4bF5MvZNsBVIxDGTi6AoENF6s8MvKWRQ"
+    // Load API key from Info.plist
+    private let apiKey: String = {
+        guard let key = Bundle.main.infoDictionary?["SupabaseAPIKey"] as? String else {
+            fatalError("SupabaseAPIKey not found in Info.plist. Please add it securely.")
+        }
+        return key
+    }()
     
     private let session = URLSession.shared
     // Network monitoring - REMOVED: Using shared network status from app level

@@ -1,0 +1,41 @@
+# Xcode
+build/
+DerivedData/
+*.pbxuser
+!default.pbxuser
+*.mode1v3
+*.mode2v3
+*.perspectivev3
+xcuserdata/
+*.xcuserstate
+
+# SwiftPM
+.build/
+
+# CocoaPods
+Pods/
+
+# Carthage
+Carthage/Build/
+
+# Fastlane
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots/
+fastlane/test_output/
+
+# Xcode automatically generated
+*.moved-aside
+*.xcuserdatad
+*.xcscmblueprint
+
+# App-specific
+CrossStreets/Info.plist
+
+# Python
+__pycache__/
+*.pyc
+
+# Misc
+.DS_Store
+.env 
