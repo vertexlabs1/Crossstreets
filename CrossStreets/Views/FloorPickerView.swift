@@ -19,23 +19,14 @@ struct FloorPickerView: View {
             VStack {
                 Spacer()
                 
-                VStack(spacing: 20) {
+                VStack(spacing: 16) { // Reduced spacing from 20 to 16
                     // Header
-                    VStack(spacing: 8) {
-                        // Parking garage specific icon
-                        ZStack {
-                            // Building background
-                            Image(systemName: "building.2")
-                                .font(.system(size: 36))
-                                .foregroundColor(.blue.opacity(0.3))
-                            
-                            // Car overlay
-                            Image(systemName: "car.fill")
-                                .font(.system(size: 20))
-                                .foregroundColor(.blue)
-                                .offset(y: -2)
-                        }
-                        .padding(.bottom, 4)
+                    VStack(spacing: 6) { // Reduced spacing from 8 to 6
+                        // Simple car icon
+                        Image(systemName: "car.fill")
+                            .font(.system(size: 36))
+                            .foregroundColor(.blue)
+                            .padding(.bottom, 2) // Reduced padding
                         
                         // Garage name for context
                         Text(garageName)
@@ -47,9 +38,9 @@ struct FloorPickerView: View {
                             .padding(.horizontal)
                         
                         Text("Select Your Floor")
-                            .font(.title3)
-                            .fontWeight(.medium)
-                            .foregroundColor(.secondary)
+                            .font(.title2) // Increased from title3 to title2
+                            .fontWeight(.semibold) // Changed from medium to semibold
+                            .foregroundColor(.primary) // Changed from secondary to primary for better visibility
                         
                         if let detectedFloor = detectedFloor, garageName != "Custom Location" {
                             Text("We detected you're on **\(detectedFloor)**. Please correct if this is wrong so we can learn!")
