@@ -15,8 +15,8 @@ struct BottomCard: View {
                     .fill(Color.gray.opacity(0.08))
                     .frame(width: 20, height: 2)
             }
-            .padding(.top, 6)
-            .padding(.bottom, 14)
+            .padding(.top, 4)
+            .padding(.bottom, 10)
             
             Group {
                 if locationManager.parkedLocation != nil {

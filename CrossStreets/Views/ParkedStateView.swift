@@ -49,8 +49,8 @@ struct ParkedStateView: View {
         }
         
         return AnyView(
-            VStack(alignment: .leading, spacing: 14) {
-                VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: 12) {
+                VStack(alignment: .leading, spacing: 4) {
                     Text("PARKED AT")
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundColor(.secondary)
@@ -60,7 +60,7 @@ struct ParkedStateView: View {
                         .font(.system(size: 17, weight: .medium))
                         .foregroundColor(.primary)
                         .multilineTextAlignment(.leading)
-                        .lineLimit(nil)
+                        .lineLimit(2)
                         .onAppear {
                             displayAddress = parkedLocation.address
                         }
@@ -83,7 +83,7 @@ struct ParkedStateView: View {
                         .padding(.top, 2)
                     }
                     
-                    HStack(spacing: 12) {
+                    HStack(spacing: 8) {
                         if let garageName = parkedLocation.garageName {
                             HStack(spacing: 4) {
                                 Image(systemName: "building.fill")
@@ -118,6 +118,8 @@ struct ParkedStateView: View {
                                 .buttonStyle(PlainButtonStyle())
                             }
                         }
+                        
+                        Spacer()
                         
                         VStack(alignment: .trailing, spacing: 2) {
                             HStack {
@@ -174,7 +176,7 @@ struct ParkedStateView: View {
                         }
                         .foregroundColor(.white)
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 15)
+                        .padding(.vertical, 12)
                         .background(Color.blue)
                         .cornerRadius(12)
                     }
@@ -199,7 +201,7 @@ struct ParkedStateView: View {
                 }
             }
             .padding(.horizontal, 20)
-            .padding(.bottom, 10)
+            .padding(.bottom, 8)
             .sheet(isPresented: $showingNotesEditor) {
                 NotesEditorView(
                     showingNotesEditor: $showingNotesEditor,

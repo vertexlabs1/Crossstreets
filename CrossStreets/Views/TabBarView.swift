@@ -63,8 +63,8 @@ struct TabBarView: View {
             }
             .buttonStyle(PlainButtonStyle())
         }
-        .padding(.top, 10)
-        .padding(.bottom, 20)
+        .padding(.top, 8)
+        .padding(.bottom, 12)
     }
 }
 
