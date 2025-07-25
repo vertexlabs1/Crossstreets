@@ -6,13 +6,13 @@ struct CurrentParkingView: View {
     
     var body: some View {
         if let parking = locationManager.parkedLocation {
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: 6) {
                 HStack {
                     Circle()
                         .fill(Color.blue)
                         .frame(width: 8, height: 8)
                     
-                    VStack(alignment: .leading, spacing: 4) {
+                    VStack(alignment: .leading, spacing: 2) {
                         Text("Currently Parked")
                             .font(.system(size: 13, weight: .medium))
                             .foregroundColor(.blue)

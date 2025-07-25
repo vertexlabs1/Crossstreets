@@ -49,8 +49,8 @@ struct ParkedStateView: View {
         }
         
         return AnyView(
-            VStack(alignment: .leading, spacing: 8) {
-                VStack(alignment: .leading, spacing: 3) {
+            VStack(alignment: .leading, spacing: 6) {
+                VStack(alignment: .leading, spacing: 2) {
                     Text("PARKED AT")
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundColor(.secondary)
@@ -124,11 +124,11 @@ struct ParkedStateView: View {
                         .padding(.top, 1)
                     }
                     
-                    HStack(spacing: 8) {
+                    HStack(spacing: 4) {
                         
                         Spacer()
                         
-                        VStack(alignment: .trailing, spacing: 2) {
+                        VStack(alignment: .trailing, spacing: 1) {
                             HStack {
                                 Spacer()
                                 
@@ -169,6 +169,7 @@ struct ParkedStateView: View {
                     }
                 }
                 .padding(.horizontal, 4)
+                .padding(.bottom, 4)
                 
                 HStack(spacing: 12) {
                     Button(action: {
