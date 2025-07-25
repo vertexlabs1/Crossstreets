@@ -177,6 +177,7 @@ struct ParkingDetailsSheet: View {
                         saveChanges()
                         dismiss()
                     }
+                    .accessibilityLabel("Save and close parking details")
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Share") {
@@ -184,6 +185,8 @@ struct ParkingDetailsSheet: View {
                         showingShareSheet = true
                     }
                     .disabled(parking.address.isEmpty)
+                    .accessibilityLabel("Share parking location")
+                    .accessibilityHint("Share your parking location with others")
                 }
                 ToolbarItemGroup(placement: .keyboard) {
                     Spacer()
@@ -192,6 +195,9 @@ struct ParkingDetailsSheet: View {
                     }
                 }
             }
+            // MARK: - Accessibility Support
+            .accessibilityElement(children: .contain)
+            .accessibilityLabel("Parking details for \(parking.garageName ?? parking.address)")
         }
         .onAppear {
             print("📱 ParkingDetailsSheet appeared with parking: \(parking)")

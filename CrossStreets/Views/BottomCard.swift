@@ -6,6 +6,17 @@ struct BottomCard: View {
     @Binding var detectedGarageName: String?
     @State private var showingParkingDetails = false
     
+    // MARK: - Gesture Configuration
+    private var gestureConfiguration: GestureConfiguration {
+        let screenHeight = UIScreen.main.bounds.height
+        return GestureConfiguration(
+            minimumDistance: 20,
+            dismissThreshold: screenHeight * 0.08, // 8% of screen height
+            velocityThreshold: 800, // Apple's recommended velocity threshold
+            animationDuration: 0.3 // Consistent with system animations
+        )
+    }
+    
     private var parkingDetailsSheet: some View {
         Group {
             if let parking = locationManager.parkedLocation {
@@ -49,7 +60,7 @@ struct BottomCard: View {
         .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: -5)
         .contentShape(Rectangle()) // Make entire area tappable
         .gesture(
-            DragGesture(minimumDistance: 20) // Require minimum distance to start
+            DragGesture(minimumDistance: gestureConfiguration.minimumDistance)
                 .onEnded { value in
                     handleGestureEnd(value: value)
                 }
@@ -60,32 +71,64 @@ struct BottomCard: View {
         .sheet(isPresented: $showingParkingDetails) {
             parkingDetailsSheet
         }
+        // MARK: - Accessibility Support
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Parking details card")
+        .accessibilityHint("Swipe up to view detailed parking information")
+        .accessibilityAction(named: "View Details") {
+            handleTap()
+        }
     }
     
     private func handleGestureEnd(value: DragGesture.Value) {
         // Only proceed if there's a parked location
-        if locationManager.parkedLocation != nil {
-            // Validate translation values to prevent NaN
-            let translationHeight = value.translation.height.isFinite ? value.translation.height : 0
-            let velocity = value.predictedEndTranslation.height - value.translation.height
-            let velocityHeight = velocity.isFinite ? velocity : 0
+        guard locationManager.parkedLocation != nil else {
+            print("❌ Cannot show parking details via gesture - no parked location")
+            return
+        }
+        
+        // Validate translation values to prevent NaN
+        let translationHeight = value.translation.height.isFinite ? value.translation.height : 0
+        let velocity = value.velocity.height
+        let velocityHeight = velocity.isFinite ? velocity : 0
+        
+        // Use screen-relative thresholds and Apple's recommended velocity
+        let shouldOpen = translationHeight < -gestureConfiguration.dismissThreshold || 
+                        velocityHeight < -gestureConfiguration.velocityThreshold
+        
+        if shouldOpen {
+            // Strategic haptic feedback for gesture completion
+            HapticManager.mediumImpact()
             
-            // Open if swiped up with sufficient distance or velocity
-            if translationHeight < -40 || velocityHeight < -150 {
+            // Animate with consistent timing
+            withAnimation(.easeInOut(duration: gestureConfiguration.animationDuration)) {
                 showingParkingDetails = true
             }
-        } else {
-            print("❌ Cannot show parking details via gesture - no parked location")
         }
     }
     
     private func handleTap() {
-        if locationManager.parkedLocation != nil {
-            showingParkingDetails = true
-        } else {
+        guard locationManager.parkedLocation != nil else {
             print("❌ Cannot show parking details - no parked location")
+            return
+        }
+        
+        // Light haptic feedback for tap
+        HapticManager.lightImpact()
+        
+        // Animate with consistent timing
+        withAnimation(.easeInOut(duration: gestureConfiguration.animationDuration)) {
+            showingParkingDetails = true
         }
     }
+}
+
+// MARK: - Gesture Configuration
+private struct GestureConfiguration {
+    let minimumDistance: CGFloat
+    let dismissThreshold: CGFloat
+    let velocityThreshold: CGFloat
+    let animationDuration: Double
 }
 
 #Preview {
