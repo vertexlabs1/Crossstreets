@@ -16,14 +16,11 @@ struct CrossStreetsApp: App {
     private let networkMonitor = NWPathMonitor()
     private let networkQueue = DispatchQueue(label: "NetworkMonitor")
     
-    // Shared LocationManager instance
-    @StateObject private var locationManager = LocationManager()
-    
     var body: some Scene {
         WindowGroup {
             ZStack {
                 // Main ContentView - always present, never recreated
-                ContentView(locationManager: locationManager, deepLinkDestination: $deepLinkDestination)
+                ContentView(deepLinkDestination: $deepLinkDestination)
                 
                 // Splash overlay - only shown when showSplash is true
                 if showSplash {
