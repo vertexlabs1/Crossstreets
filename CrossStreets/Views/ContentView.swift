@@ -48,14 +48,6 @@ struct ContentView: View {
     }
     
     var body: some View {
-        #if DEBUG
-        // Throttle debug prints to reduce log spam
-        let now = Date()
-        if now.timeIntervalSince(lastDebugPrint) >= 5.0 {
-            print("🗺️ ContentView body computed")
-            lastDebugPrint = now
-        }
-        #endif
         ZStack {
             Map(position: $position) {
                 UserAnnotation()
@@ -128,6 +120,19 @@ struct ContentView: View {
                 .zIndex(2)
             }
         }
+        .onAppear {
+            // Request location permission on app launch
+            locationManager.requestLocationPermission()
+            
+            #if DEBUG
+            // Throttle debug prints to reduce log spam
+            let now = Date()
+            if now.timeIntervalSince(lastDebugPrint) >= 5.0 {
+                print("🗺️ ContentView body computed")
+                lastDebugPrint = now
+            }
+            #endif
+        }
         .sheet(isPresented: $showHistorySheet) {
             HistoryView(locationManager: locationManager, selectedTab: $selectedTab)
         }
@@ -138,10 +143,6 @@ struct ContentView: View {
             Button("OK") { }
         } message: {
             Text(errorMessage)
-        }
-        .onAppear {
-            // Request location permission on app launch
-            locationManager.requestLocationPermission()
         }
         .onChange(of: locationManager.detectedGarageInfo) { _, newGarageInfo in
             // Throttle updates to prevent excessive view rebuilds
