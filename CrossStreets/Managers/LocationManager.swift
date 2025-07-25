@@ -85,6 +85,30 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     }
     @Published var barometricPressure: Double?
     
+    // Enhanced sensor data tracking
+    @Published var gpsAltitude: Double?
+    @Published var gpsVerticalAccuracy: Double?
+    @Published var sensorDataQuality: SensorDataQuality = .unknown
+    
+    // Sensor data quality enum
+    enum SensorDataQuality {
+        case excellent
+        case good
+        case poor
+        case unavailable
+        case unknown
+        
+        var description: String {
+            switch self {
+            case .excellent: return "excellent"
+            case .good: return "good"
+            case .poor: return "poor"
+            case .unavailable: return "unavailable"
+            case .unknown: return "unknown"
+            }
+        }
+    }
+    
     // Network monitor
     // Network monitoring - REMOVED: Using shared network status from app level
     
@@ -156,6 +180,7 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
         // Check if altimeter is available
         guard CMAltimeter.isRelativeAltitudeAvailable() else {
             print("⚠️ Barometric altimeter not available on this device")
+            sensorDataQuality = .unavailable
             return
         }
         
@@ -164,11 +189,23 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     }
     
     private func startAltimeter() {
-        guard CMAltimeter.isRelativeAltitudeAvailable() else { return }
+        guard CMAltimeter.isRelativeAltitudeAvailable() else { 
+            print("⚠️ Cannot start altimeter - not available")
+            return 
+        }
         
+        print("🔄 Starting barometric altitude monitoring...")
         altimeter.startRelativeAltitudeUpdates(to: .main) { [weak self] data, error in
-            guard let data = data, error == nil else {
-                print("⚠️ Altimeter error: \(error?.localizedDescription ?? "Unknown error")")
+            if let error = error {
+                print("❌ Altimeter error: \(error.localizedDescription)")
+                DispatchQueue.main.async {
+                    self?.sensorDataQuality = .unavailable
+                }
+                return
+            }
+            
+            guard let data = data else {
+                print("⚠️ Altimeter returned no data")
                 return
             }
             
@@ -177,15 +214,38 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
                 let now = Date()
                 guard now.timeIntervalSince(self?.lastBarometricUpdate ?? .distantPast) > 10.0 else { return }
                 
-                self?.barometricAltitude = data.relativeAltitude.doubleValue
-                self?.barometricPressure = data.pressure.doubleValue
+                let altitude = data.relativeAltitude.doubleValue
+                let pressure = data.pressure.doubleValue
+                
+                self?.barometricAltitude = altitude
+                self?.barometricPressure = pressure
                 self?.lastBarometricUpdate = now
                 
+                // Assess data quality
+                let quality = self?.assessBarometricDataQuality(altitude: altitude, pressure: pressure) ?? .unknown
+                self?.sensorDataQuality = quality
+                
                 // Log significant changes for debugging
-                if let altitude = self?.barometricAltitude, abs(altitude) > 1.0 {
-                    print("📊 Barometric altitude: \(altitude)m, pressure: \(data.pressure.doubleValue) kPa")
+                if abs(altitude) > 1.0 {
+                    print("📊 Barometric: \(altitude)m, \(pressure) kPa (quality: \(quality.description))")
                 }
             }
+        }
+    }
+    
+    private func assessBarometricDataQuality(altitude: Double, pressure: Double) -> SensorDataQuality {
+        // Check for reasonable pressure values (typically 90-110 kPa at sea level)
+        let isPressureReasonable = pressure >= 80.0 && pressure <= 120.0
+        
+        // Check for reasonable altitude values (not extreme)
+        let isAltitudeReasonable = abs(altitude) < 1000.0
+        
+        if isPressureReasonable && isAltitudeReasonable {
+            return .excellent
+        } else if isPressureReasonable || isAltitudeReasonable {
+            return .good
+        } else {
+            return .poor
         }
     }
     
@@ -208,26 +268,61 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
         // Start with a more user-friendly initial message
         completion("Getting address...")
         
+        // Use retry logic for better reliability
+        attemptAddressResolution(coordinate: coordinate, niceCoordinates: niceCoordinates, retryCount: 0, completion: completion)
+    }
+    
+    private func attemptAddressResolution(
+        coordinate: CLLocationCoordinate2D, 
+        niceCoordinates: String, 
+        retryCount: Int, 
+        completion: @escaping (String) -> Void
+    ) {
+        let maxRetries = 2
         let location = CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
         let geocoder = CLGeocoder()
         var hasCompleted = false
         
-        // Shorter timeout for better responsiveness
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+        print("🌍 Address resolution attempt \(retryCount + 1)/\(maxRetries + 1)")
+        
+        // Timeout based on retry count (longer for retries)
+        let timeout = retryCount == 0 ? 2.0 : 3.0
+        DispatchQueue.main.asyncAfter(deadline: .now() + timeout) {
             if !hasCompleted {
-                print("🌍 getSmartAddress: Timeout reached, using coordinates")
+                print("🌍 Address resolution: Timeout reached (attempt \(retryCount + 1))")
                 hasCompleted = true
-                completion(niceCoordinates)
+                
+                if retryCount < maxRetries {
+                    print("🌍 Address resolution: Retrying...")
+                    self.attemptAddressResolution(coordinate: coordinate, niceCoordinates: niceCoordinates, retryCount: retryCount + 1, completion: completion)
+                } else {
+                    print("🌍 Address resolution: All attempts failed, using coordinates")
+                    completion(niceCoordinates)
+                }
             }
         }
         
         geocoder.reverseGeocodeLocation(location) { [weak self] placemarks, error in
-            print("🌍 getSmartAddress: Geocoding completed, error: \(error?.localizedDescription ?? "none")")
             guard !hasCompleted else { return }
             hasCompleted = true
+            
+            if let error = error {
+                print("🌍 Address resolution: Error on attempt \(retryCount + 1): \(error.localizedDescription)")
+                
+                if retryCount < maxRetries {
+                    print("🌍 Address resolution: Retrying due to error...")
+                    self?.attemptAddressResolution(coordinate: coordinate, niceCoordinates: niceCoordinates, retryCount: retryCount + 1, completion: completion)
+                } else {
+                    print("🌍 Address resolution: All attempts failed, using coordinates")
+                    completion(niceCoordinates)
+                }
+                return
+            }
+            
             var address = niceCoordinates
-            if let placemark = placemarks?.first, error == nil {
-                print("🌍 getSmartAddress: Found placemark: \(placemark.name ?? "unnamed")")
+            if let placemark = placemarks?.first {
+                print("🌍 Address resolution: Found placemark: \(placemark.name ?? "unnamed")")
+                
                 if let name = placemark.name, !name.isEmpty {
                     address = name
                 } else if let thoroughfare = placemark.thoroughfare {
@@ -239,23 +334,25 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
                 } else if let locality = placemark.locality {
                     address = locality
                 }
+                
+                // Check for nearby stores as fallback
                 self?.checkForNearbyStores(at: location) { nearbyStore in
                     if let store = nearbyStore {
-                        print("🌍 getSmartAddress: Found nearby store: \(store)")
+                        print("🌍 Address resolution: Found nearby store: \(store)")
                         completion("Near \(store)")
                     } else {
-                        print("🌍 getSmartAddress: Using address: \(address)")
+                        print("🌍 Address resolution: Using resolved address: \(address)")
                         completion(address)
                     }
                 }
             } else {
-                print("🌍 getSmartAddress: No placemark found, checking nearby stores")
+                print("🌍 Address resolution: No placemark found, checking nearby stores")
                 self?.checkForNearbyStores(at: location) { nearbyStore in
                     if let store = nearbyStore {
-                        print("🌍 getSmartAddress: Found nearby store: \(store)")
+                        print("🌍 Address resolution: Found nearby store: \(store)")
                         completion("Near \(store)")
                     } else {
-                        print("🌍 getSmartAddress: Using coordinates: \(address)")
+                        print("🌍 Address resolution: Using coordinates: \(address)")
                         completion(address)
                     }
                 }
@@ -365,6 +462,16 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
             let now = Date()
             guard now.timeIntervalSince(self.lastLocationUpdate) >= 2.0 else { return }
             
+            // Track GPS altitude and accuracy
+            self.gpsAltitude = location.altitude
+            self.gpsVerticalAccuracy = location.verticalAccuracy
+            
+            // Log GPS data quality
+            let gpsQuality = self.assessGPSDataQuality(location: location)
+            if gpsQuality != self.sensorDataQuality {
+                print("📡 GPS: \(location.altitude)m ±\(location.verticalAccuracy)m (quality: \(gpsQuality.description))")
+            }
+            
             // Only update if location is significantly different
             if let currentLocation = self.currentLocation {
                 let distance = location.distance(from: currentLocation)
@@ -377,6 +484,33 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
             self.lastLocationUpdate = now
             self.optimizeLocationAccuracy()
         }
+    }
+    
+    private func assessGPSDataQuality(location: CLLocation) -> SensorDataQuality {
+        let horizontalAccuracy = location.horizontalAccuracy
+        let verticalAccuracy = location.verticalAccuracy
+        
+        // Check if we have valid altitude data
+        let hasValidAltitude = verticalAccuracy > 0 && verticalAccuracy < 50.0
+        
+        // Assess horizontal accuracy
+        let horizontalQuality: SensorDataQuality
+        if horizontalAccuracy <= 5.0 {
+            horizontalQuality = .excellent
+        } else if horizontalAccuracy <= 15.0 {
+            horizontalQuality = .good
+        } else if horizontalAccuracy <= 50.0 {
+            horizontalQuality = .poor
+        } else {
+            horizontalQuality = .unavailable
+        }
+        
+        // If we have good horizontal accuracy but poor vertical, still consider it usable
+        if hasValidAltitude && horizontalQuality != .unavailable {
+            return verticalAccuracy <= 10.0 ? .excellent : .good
+        }
+        
+        return horizontalQuality
     }
     
     func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
@@ -1026,33 +1160,99 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     // MARK: - Altitude-Based Floor Detection
     
     func detectFloorForGarage(_ garageName: String) -> String? {
-        guard let location = currentLocation else { return nil }
-        
-        // Use barometric altitude if available, otherwise fall back to GPS altitude
-        let altitude: Double
-        let altitudeSource: String
-        
-        if let barometricAltitude = barometricAltitude, let _ = self.barometricPressure {
-            altitude = roundAltitude(barometricAltitude)
-            altitudeSource = "barometric"
-        } else {
-            altitude = roundAltitude(location.altitude)
-            altitudeSource = "gps"
+        guard let location = currentLocation else { 
+            print("⚠️ Floor detection: No current location available")
+            return nil 
         }
         
-        // Validate altitude data quality
-        guard isValidAltitude(altitude, source: altitudeSource, location: location) else {
-            #if DEBUG
-            print("⚠️ Poor altitude data quality - skipping floor detection")
-            #endif
+        print("🏢 Floor detection for '\(garageName)' - analyzing sensor data...")
+        
+        // Collect all available sensor data
+        let sensorData = collectSensorData(location: location)
+        print("📊 Sensor data: \(sensorData.description)")
+        
+        // Determine best altitude source
+        let (altitude, altitudeSource) = determineBestAltitudeSource(sensorData: sensorData, location: location)
+        
+        guard let finalAltitude = altitude else {
+            print("❌ Floor detection: No valid altitude data available")
             return nil
         }
         
-        // Check if we have existing data for this garage
-        // Removed: garageAltitudeData - now handled by Supabase
+        // Validate altitude data quality
+        guard isValidAltitude(finalAltitude, source: altitudeSource, location: location) else {
+            print("⚠️ Floor detection: Poor altitude data quality - skipping")
+            return nil
+        }
         
-        // No existing data, make educated guess based on common patterns
-        return makeInitialFloorGuess(altitude: altitude, garageName: garageName, source: altitudeSource)
+        // Make educated guess based on common patterns
+        let detectedFloor = makeInitialFloorGuess(altitude: finalAltitude, garageName: garageName, source: altitudeSource)
+        print("🏢 Floor detection: Detected \(detectedFloor) (altitude: \(finalAltitude)m, source: \(altitudeSource))")
+        
+        return detectedFloor
+    }
+    
+    private struct SensorData {
+        let barometricAltitude: Double?
+        let barometricPressure: Double?
+        let gpsAltitude: Double?
+        let gpsVerticalAccuracy: Double?
+        let barometricQuality: SensorDataQuality
+        let gpsQuality: SensorDataQuality
+        
+        var description: String {
+            var parts: [String] = []
+            if let baroAlt = barometricAltitude {
+                parts.append("baro: \(baroAlt)m")
+            }
+            if let baroPress = barometricPressure {
+                parts.append("pressure: \(baroPress) kPa")
+            }
+            if let gpsAlt = gpsAltitude {
+                parts.append("gps: \(gpsAlt)m ±\(gpsVerticalAccuracy ?? 0)m")
+            }
+            parts.append("baro quality: \(barometricQuality.description)")
+            parts.append("gps quality: \(gpsQuality.description)")
+            return parts.joined(separator: ", ")
+        }
+    }
+    
+    private func collectSensorData(location: CLLocation) -> SensorData {
+        let barometricQuality = sensorDataQuality
+        let gpsQuality = assessGPSDataQuality(location: location)
+        
+        return SensorData(
+            barometricAltitude: barometricAltitude,
+            barometricPressure: barometricPressure,
+            gpsAltitude: location.altitude,
+            gpsVerticalAccuracy: location.verticalAccuracy,
+            barometricQuality: barometricQuality,
+            gpsQuality: gpsQuality
+        )
+    }
+    
+    private func determineBestAltitudeSource(sensorData: SensorData, location: CLLocation) -> (altitude: Double?, source: String) {
+        // Priority: Barometric (if available and good quality)
+        if let barometricAltitude = sensorData.barometricAltitude,
+           let _ = sensorData.barometricPressure,
+           sensorData.barometricQuality == .excellent || sensorData.barometricQuality == .good {
+            return (roundAltitude(barometricAltitude), "barometric")
+        }
+        
+        // Fallback: GPS (if available and reasonable accuracy)
+        if let gpsAltitude = sensorData.gpsAltitude,
+           sensorData.gpsQuality != .unavailable,
+           location.verticalAccuracy > 0 && location.verticalAccuracy < 50.0 {
+            return (roundAltitude(gpsAltitude), "gps")
+        }
+        
+        // Last resort: Barometric even if poor quality
+        if let barometricAltitude = sensorData.barometricAltitude,
+           let _ = sensorData.barometricPressure {
+            return (roundAltitude(barometricAltitude), "barometric_poor")
+        }
+        
+        return (nil, "none")
     }
     
     private func isValidAltitude(_ altitude: Double, source: String, location: CLLocation) -> Bool {
@@ -1121,27 +1321,21 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     }
     
     func logFloorDetectionResult(detectedFloor: String, actualFloor: String, garageName: String) {
-        guard let location = currentLocation else { return }
-        
-        // Use barometric altitude if available, otherwise GPS
-        let altitude: Double
-        let altitudeSource: String
-        var barometricPressure: Double?
-        
-        if let barometricAltitude = barometricAltitude, let pressure = self.barometricPressure {
-            altitude = roundAltitude(barometricAltitude)
-            altitudeSource = "barometric"
-            barometricPressure = pressure
-        } else {
-            altitude = roundAltitude(location.altitude)
-            altitudeSource = "gps"
-            barometricPressure = nil
+        guard let location = currentLocation else { 
+            print("⚠️ Floor logging: No current location available")
+            return 
         }
+        
+        print("📊 Floor Detection Result: \(detectedFloor) → \(actualFloor)")
+        
+        // Collect comprehensive sensor data
+        let sensorData = collectSensorData(location: location)
+        let (altitude, altitudeSource) = determineBestAltitudeSource(sensorData: sensorData, location: location)
         
         let wasCorrect = detectedFloor == actualFloor
         
         // Log floor detection accuracy for monitoring
-        PerformanceMonitor.shared.logFloorDetectionAccuracy(wasCorrect, altitudeSource: altitudeSource)
+        PerformanceMonitor.shared.logFloorDetectionAccuracy(wasCorrect, altitudeSource: altitudeSource ?? "none")
         
         // Log user action for floor selection
         SupabaseManager.shared.logUserAction(
@@ -1153,23 +1347,32 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
                 "actual_floor": actualFloor,
                 "garage_name": garageName,
                 "was_correct": wasCorrect,
-                "altitude_source": altitudeSource
+                "altitude_source": altitudeSource ?? "none",
+                "sensor_data": sensorData.description
             ]
         ) { _ in }
         
         // Log for analysis
-        print("📊 Floor Detection: \(detectedFloor) → \(actualFloor) (\(wasCorrect ? "✅" : "❌")) Altitude: \(altitude)m (\(altitudeSource))")
+        print("📊 Floor Detection: \(detectedFloor) → \(actualFloor) (\(wasCorrect ? "✅" : "❌"))")
+        print("📊 Sensor Data: \(sensorData.description)")
+        if let finalAltitude = altitude {
+            print("📊 Final Altitude: \(finalAltitude)m (\(altitudeSource ?? "unknown"))")
+        }
         
-        // Send to Supabase for real-time analytics
+        // Send to Supabase for real-time analytics with enhanced data
         SupabaseManager.shared.logFloorCorrection(
             garageName: garageName,
             detectedFloor: detectedFloor,
             actualFloor: actualFloor,
-            altitude: altitude,
-            altitudeSource: altitudeSource,
-            barometricPressure: barometricPressure,
+            altitude: altitude ?? 0.0,
+            altitudeSource: altitudeSource ?? "none",
+            barometricPressure: sensorData.barometricPressure,
             wasCorrect: wasCorrect,
-            location: location.coordinate
+            location: location.coordinate,
+            gpsAltitude: sensorData.gpsAltitude,
+            gpsVerticalAccuracy: sensorData.gpsVerticalAccuracy,
+            barometricAltitude: sensorData.barometricAltitude,
+            sensorQuality: sensorDataQuality.description
         ) { success in
             if success {
                 print("✅ Supabase: Floor correction synced successfully")

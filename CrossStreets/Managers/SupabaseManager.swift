@@ -138,6 +138,10 @@ class SupabaseManager: ObservableObject {
         barometricPressure: Double?,
         wasCorrect: Bool,
         location: CLLocationCoordinate2D,
+        gpsAltitude: Double? = nil,
+        gpsVerticalAccuracy: Double? = nil,
+        barometricAltitude: Double? = nil,
+        sensorQuality: String? = nil,
         completion: @escaping (Bool) -> Void
     ) {
         let data: [String: Any] = [
@@ -147,7 +151,10 @@ class SupabaseManager: ObservableObject {
             "altitude": altitude,
             "altitude_source": altitudeSource,
             "barometric_pressure": barometricPressure as Any,
-            "gps_accuracy": 0.0, // Will be updated if available
+            "gps_altitude": gpsAltitude as Any,
+            "gps_vertical_accuracy": gpsVerticalAccuracy as Any,
+            "barometric_altitude": barometricAltitude as Any,
+            "sensor_quality": sensorQuality as Any,
             "was_correct": wasCorrect,
             "latitude": location.latitude,
             "longitude": location.longitude,
