@@ -4,10 +4,6 @@ struct CurrentParkingView: View {
     @ObservedObject var locationManager: LocationManager
     @State private var displayAddress: String = ""
     
-    // Timer for timeAgo display - updates every 30 seconds instead of every second
-    @State private var timeAgoString: String = ""
-    @State private var timeAgoTimer: Timer?
-    
     var body: some View {
         if let parking = locationManager.parkedLocation {
             VStack(alignment: .leading, spacing: 12) {
@@ -44,7 +40,8 @@ struct CurrentParkingView: View {
                         }
                         
                         HStack(spacing: 8) {
-                            Text(timeAgoString)
+                            // Use the separate TimeAgoView component
+                            TimeAgoView(timestamp: parking.timestamp)
                                 .font(.system(size: 12))
                                 .foregroundColor(.secondary)
                             
@@ -66,34 +63,10 @@ struct CurrentParkingView: View {
                 .background(Color.blue.opacity(0.05))
                 .cornerRadius(10)
             }
-            .onAppear {
-                updateTimeAgo()
-                startTimeAgoTimer()
-            }
-            .onDisappear {
-                stopTimeAgoTimer()
-            }
             // Removed onReceive to prevent continuous view rebuilding
         } else {
             EmptyView()
         }
-    }
-    
-    private func updateTimeAgo() {
-        guard let parking = locationManager.parkedLocation else { return }
-        timeAgoString = DateHelper.timeAgo(from: parking.timestamp)
-    }
-    
-    private func startTimeAgoTimer() {
-        // Update every 30 seconds instead of every second
-        timeAgoTimer = Timer.scheduledTimer(withTimeInterval: 30.0, repeats: true) { _ in
-            updateTimeAgo()
-        }
-    }
-    
-    private func stopTimeAgoTimer() {
-        timeAgoTimer?.invalidate()
-        timeAgoTimer = nil
     }
 }
 

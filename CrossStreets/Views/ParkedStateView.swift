@@ -1,15 +1,47 @@
 import SwiftUI
 
+// Separate view component that manages its own timer
+struct TimeAgoView: View {
+    let timestamp: Date
+    @State private var timeAgoString: String = ""
+    @State private var timer: Timer?
+    
+    var body: some View {
+        Text(timeAgoString)
+            .font(.system(size: 13))
+            .foregroundColor(.secondary)
+            .onAppear {
+                updateTimeAgo()
+                startTimer()
+            }
+            .onDisappear {
+                stopTimer()
+            }
+    }
+    
+    private func updateTimeAgo() {
+        timeAgoString = DateHelper.timeAgo(from: timestamp)
+    }
+    
+    private func startTimer() {
+        // Update every second for real-time counting
+        timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
+            updateTimeAgo()
+        }
+    }
+    
+    private func stopTimer() {
+        timer?.invalidate()
+        timer = nil
+    }
+}
+
 struct ParkedStateView: View {
     @ObservedObject var locationManager: LocationManager
     @Binding var showingFloorPicker: Bool
     @Binding var detectedGarageName: String?
     @State private var displayAddress: String = ""
     @State private var showingNotesEditor: Bool = false
-    
-    // Timer for timeAgo display - updates every 30 seconds instead of every second
-    @State private var timeAgoString: String = ""
-    @State private var timeAgoTimer: Timer?
     
     var body: some View {
         guard let parkedLocation = locationManager.parkedLocation else {
@@ -110,9 +142,8 @@ struct ParkedStateView: View {
                                 .buttonStyle(PlainButtonStyle())
                             }
                             
-                            Text(timeAgoString)
-                                .font(.system(size: 13))
-                                .foregroundColor(.secondary)
+                            // Use the separate TimeAgoView component
+                            TimeAgoView(timestamp: parkedLocation.timestamp)
                             
                             // Show offline indicator if showing coordinates
                             if parkedLocation.address.contains("°") {
@@ -169,13 +200,6 @@ struct ParkedStateView: View {
             }
             .padding(.horizontal, 20)
             .padding(.bottom, 10)
-            .onAppear {
-                updateTimeAgo()
-                startTimeAgoTimer()
-            }
-            .onDisappear {
-                stopTimeAgoTimer()
-            }
             .sheet(isPresented: $showingNotesEditor) {
                 NotesEditorView(
                     showingNotesEditor: $showingNotesEditor,
@@ -185,23 +209,6 @@ struct ParkedStateView: View {
                 )
             }
         )
-    }
-    
-    private func updateTimeAgo() {
-        guard let parkedLocation = locationManager.parkedLocation else { return }
-        timeAgoString = DateHelper.timeAgo(from: parkedLocation.timestamp)
-    }
-    
-    private func startTimeAgoTimer() {
-        // Update every 30 seconds instead of every second
-        timeAgoTimer = Timer.scheduledTimer(withTimeInterval: 30.0, repeats: true) { _ in
-            updateTimeAgo()
-        }
-    }
-    
-    private func stopTimeAgoTimer() {
-        timeAgoTimer?.invalidate()
-        timeAgoTimer = nil
     }
 }
 
