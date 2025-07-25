@@ -10,8 +10,40 @@ struct ParkingDetailsSheet: View {
     @State private var parkingPhotos: [UIImage] = []
     @State private var showingImagePicker = false
     @State private var showingShareSheet = false
-    @State private var shareText = ""
     @FocusState private var isNotesFieldFocused: Bool
+    
+    private var shareContent: String {
+        print("📤 Computing share content for parking: \(parking)")
+        print("📤 Parking details:")
+        print("   - Address: '\(parking.address)'")
+        print("   - Garage: \(parking.garageName ?? "nil")")
+        print("   - Floor: \(parking.floor ?? "nil")")
+        print("   - Coordinates: \(parking.coordinate.latitude), \(parking.coordinate.longitude)")
+        print("   - Timestamp: \(parking.timestamp)")
+        
+        // Validate parking data
+        guard !parking.address.isEmpty else {
+            print("❌ Share failed: Empty address")
+            return "Unable to share location - address not available"
+        }
+        
+        let locationText: String
+        if let garageName = parking.garageName {
+            if let floor = parking.floor {
+                locationText = "Hey, I'm parked at \(garageName) on floor \(floor)"
+            } else {
+                locationText = "Hey, I'm parked at \(garageName)"
+            }
+        } else {
+            locationText = "Hey, I'm parked at \(parking.address)"
+        }
+        
+        let directionsLink = "\n\nGet directions: maps://?q=\(parking.coordinate.latitude),\(parking.coordinate.longitude)"
+        
+        let content = locationText + directionsLink
+        print("📤 Share content computed: '\(content)'")
+        return content
+    }
     
     var body: some View {
         NavigationView {
@@ -149,8 +181,6 @@ struct ParkingDetailsSheet: View {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Share") {
                         print("📤 Share button pressed")
-                        prepareShareContent()
-                        print("📤 About to show share sheet with text: '\(shareText)'")
                         showingShareSheet = true
                     }
                     .disabled(parking.address.isEmpty)
@@ -191,46 +221,13 @@ struct ParkingDetailsSheet: View {
             ))
         }
         .sheet(isPresented: $showingShareSheet) {
-            ShareSheet(activityItems: [shareText])
+            ShareSheet(activityItems: [shareContent])
         }
     }
     
     private func saveChanges() {
         locationManager.updateParkingNotes(notes)
         locationManager.updateParkingPhotos(parkingPhotos)
-    }
-    
-    private func prepareShareContent() {
-        print("📤 Preparing share content for parking: \(parking)")
-        print("📤 Parking details:")
-        print("   - Address: '\(parking.address)'")
-        print("   - Garage: \(parking.garageName ?? "nil")")
-        print("   - Floor: \(parking.floor ?? "nil")")
-        print("   - Coordinates: \(parking.coordinate.latitude), \(parking.coordinate.longitude)")
-        print("   - Timestamp: \(parking.timestamp)")
-        
-        // Validate parking data
-        guard !parking.address.isEmpty else {
-            print("❌ Share failed: Empty address")
-            shareText = "Unable to share location - address not available"
-            return
-        }
-        
-        let locationText: String
-        if let garageName = parking.garageName {
-            if let floor = parking.floor {
-                locationText = "Hey, I'm parked at \(garageName) on floor \(floor)"
-            } else {
-                locationText = "Hey, I'm parked at \(garageName)"
-            }
-        } else {
-            locationText = "Hey, I'm parked at \(parking.address)"
-        }
-        
-        let directionsLink = "\n\nGet directions: maps://?q=\(parking.coordinate.latitude),\(parking.coordinate.longitude)"
-        
-        shareText = locationText + directionsLink
-        print("📤 Share text prepared: '\(shareText)'")
     }
 }
 
