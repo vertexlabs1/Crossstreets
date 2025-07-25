@@ -1,0 +1,3 @@
+# This file suppresses the harmless "Failed to locate resource named 'default.csv'" error
+# It's a system-level error from iOS frameworks, not from our code
+# This file is intentionally minimal and serves no functional purpose 
