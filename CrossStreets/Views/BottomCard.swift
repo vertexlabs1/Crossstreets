@@ -6,6 +6,19 @@ struct BottomCard: View {
     @Binding var detectedGarageName: String?
     @State private var showingParkingDetails = false
     
+    private var parkingDetailsSheet: some View {
+        Group {
+            if let parking = locationManager.parkedLocation {
+                ParkingDetailsSheet(locationManager: locationManager, parking: parking)
+                    .presentationDetents([.large])
+                    .presentationDragIndicator(.visible)
+                    .presentationCornerRadius(20)
+            } else {
+                EmptyView()
+            }
+        }
+    }
+    
     var body: some View {
         VStack(spacing: 0) {
             // Native drag indicator
@@ -45,7 +58,7 @@ struct BottomCard: View {
             handleTap()
         }
         .sheet(isPresented: $showingParkingDetails) {
-            ParkingDetailsSheetView(locationManager: locationManager)
+            parkingDetailsSheet
         }
     }
     
@@ -71,23 +84,6 @@ struct BottomCard: View {
             showingParkingDetails = true
         } else {
             print("❌ Cannot show parking details - no parked location")
-        }
-    }
-}
-
-struct ParkingDetailsSheetView: View {
-    @ObservedObject var locationManager: LocationManager
-    
-    var body: some View {
-        if let parking = locationManager.parkedLocation {
-            print("📱 Presenting ParkingDetailsSheet with parking: \(parking)")
-            ParkingDetailsSheet(locationManager: locationManager, parking: parking)
-                .presentationDetents([.large])
-                .presentationDragIndicator(.visible)
-                .presentationCornerRadius(20)
-        } else {
-            print("❌ ParkingDetailsSheet: No parked location available")
-            EmptyView()
         }
     }
 }
