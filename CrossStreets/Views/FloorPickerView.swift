@@ -39,15 +39,9 @@ struct FloorPickerView: View {
                             .padding(.bottom, 2) // Add spacing between garage name and "Select Your Floor"
                         
                         Text("Select Your Floor")
-                            .font(.title) // Increased from title2 to title for maximum visibility
-                            .fontWeight(.black) // Changed from bold to black for maximum prominence
-                            .foregroundColor(.primary) // Primary color for maximum contrast
-                            .padding(.vertical, 8) // Add vertical padding to make it more prominent
-                            .padding(.horizontal, 16) // Add horizontal padding
-                            .background(
-                                RoundedRectangle(cornerRadius: 8)
-                                    .fill(Color.blue.opacity(0.1)) // Light blue background to make it stand out
-                            )
+                            .font(.title) // Large font for visibility
+                            .fontWeight(.black) // Maximum prominence
+                            .foregroundColor(.black) // Same color as floor button text
                             .padding(.bottom, 8) // Add bottom padding to separate from description
                         
                         if let detectedFloor = detectedFloor, garageName != "Custom Location" {
