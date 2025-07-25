@@ -25,6 +25,9 @@ struct ContentView: View {
     // Throttle for detectedGarageInfo updates
     @State private var lastGarageInfoUpdate: Date = Date.distantPast
     
+    // Debounce for location updates to prevent excessive recomputations
+    @State private var lastLocationUpdate: Date = Date.distantPast
+    
     // Only print initialization log once per app launch
     static var hasPrintedInit = false
     
@@ -68,6 +71,11 @@ struct ContentView: View {
                 }
             }
             .onChange(of: locationManager.currentLocation) { _, newLocation in
+                // Debounce location updates to prevent excessive view rebuilds
+                let now = Date()
+                guard now.timeIntervalSince(lastLocationUpdate) >= 1.0 else { return }
+                lastLocationUpdate = now
+                
                 if let location = newLocation {
                     centerMapOnUser(location: location)
                 }
