@@ -16,6 +16,8 @@ class SupabaseManager: ObservableObject {
             print("🔍 Debug: Bundle info dictionary keys: \(infoDict.keys.sorted())")
             if let key = infoDict["SupabaseAPIKey"] as? String {
                 print("🔍 Debug: Found SupabaseAPIKey in bundle: \(key.prefix(30))... (length: \(key.count))")
+                print("🔍 Debug: Full API key value: '\(key)'")
+                print("🔍 Debug: API key starts with 'eyJ': \(key.hasPrefix("eyJ"))")
             } else {
                 print("🔍 Debug: SupabaseAPIKey not found or not a string in bundle")
             }
