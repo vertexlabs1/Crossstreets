@@ -1335,7 +1335,7 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
         let wasCorrect = detectedFloor == actualFloor
         
         // Log floor detection accuracy for monitoring
-        PerformanceMonitor.shared.logFloorDetectionAccuracy(wasCorrect, altitudeSource: altitudeSource ?? "none")
+        PerformanceMonitor.shared.logFloorDetectionAccuracy(wasCorrect, altitudeSource: altitudeSource)
         
         // Log user action for floor selection
         SupabaseManager.shared.logUserAction(
@@ -1347,7 +1347,7 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
                 "actual_floor": actualFloor,
                 "garage_name": garageName,
                 "was_correct": wasCorrect,
-                "altitude_source": altitudeSource ?? "none",
+                "altitude_source": altitudeSource,
                 "sensor_data": sensorData.description
             ]
         ) { _ in }
@@ -1356,7 +1356,7 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
         print("📊 Floor Detection: \(detectedFloor) → \(actualFloor) (\(wasCorrect ? "✅" : "❌"))")
         print("📊 Sensor Data: \(sensorData.description)")
         if let finalAltitude = altitude {
-            print("📊 Final Altitude: \(finalAltitude)m (\(altitudeSource ?? "unknown"))")
+            print("📊 Final Altitude: \(finalAltitude)m (\(altitudeSource))")
         }
         
         // Send to Supabase for real-time analytics with enhanced data
@@ -1365,7 +1365,7 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
             detectedFloor: detectedFloor,
             actualFloor: actualFloor,
             altitude: altitude ?? 0.0,
-            altitudeSource: altitudeSource ?? "none",
+            altitudeSource: altitudeSource,
             barometricPressure: sensorData.barometricPressure,
             wasCorrect: wasCorrect,
             location: location.coordinate,
