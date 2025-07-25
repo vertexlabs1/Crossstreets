@@ -30,17 +30,19 @@ struct FloorPickerView: View {
                         
                         // Garage name for context
                         Text(garageName)
-                            .font(.headline)
-                            .fontWeight(.semibold)
+                            .font(.title) // Increased from headline to title for more prominence
+                            .fontWeight(.bold) // Changed from semibold to bold
                             .foregroundColor(.primary)
                             .multilineTextAlignment(.center)
                             .lineLimit(2)
                             .padding(.horizontal)
+                            .padding(.bottom, 2) // Add spacing between garage name and "Select Your Floor"
                         
                         Text("Select Your Floor")
                             .font(.title2) // Increased from title3 to title2
-                            .fontWeight(.semibold) // Changed from medium to semibold
+                            .fontWeight(.bold) // Changed from semibold to bold for better visibility
                             .foregroundColor(.primary) // Changed from secondary to primary for better visibility
+                            .padding(.bottom, 4) // Add some padding to separate it from the description text
                         
                         if let detectedFloor = detectedFloor, garageName != "Custom Location" {
                             Text("We detected you're on **\(detectedFloor)**. Please correct if this is wrong so we can learn!")
