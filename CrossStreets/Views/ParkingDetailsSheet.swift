@@ -8,7 +8,6 @@ struct ParkingDetailsSheet: View {
     @State private var notes: String = ""
     @State private var selectedPhotos: [PhotosPickerItem] = []
     @State private var parkingPhotos: [UIImage] = []
-    @State private var isNotesFieldFocused: Bool = false
     @State private var showingImagePicker = false
     @State private var showingShareSheet = false
     @State private var shareText = ""
@@ -53,7 +52,6 @@ struct ParkingDetailsSheet: View {
                         TextField("Add a note about your parking spot...", text: $notes, axis: .vertical)
                             .textFieldStyle(.roundedBorder)
                             .lineLimit(3...6)
-                            .focused($isNotesFieldFocused)
                     }
                     .padding(.horizontal)
                     
@@ -150,12 +148,6 @@ struct ParkingDetailsSheet: View {
                     Button("Share") {
                         prepareShareContent()
                         showingShareSheet = true
-                    }
-                }
-                ToolbarItemGroup(placement: .keyboard) {
-                    Spacer()
-                    Button("Done") {
-                        isNotesFieldFocused = false
                     }
                 }
             }
