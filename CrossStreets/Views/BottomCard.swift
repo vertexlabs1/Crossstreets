@@ -5,6 +5,7 @@ struct BottomCard: View {
     @Binding var showingFloorPicker: Bool
     @Binding var detectedGarageName: String?
     @State private var showingParkingDetails = false
+    @State private var dragOffset: CGFloat = 0
     
     var body: some View {
         VStack(spacing: 0) {
@@ -37,7 +38,33 @@ struct BottomCard: View {
                 }
             }
         }
+        .offset(y: dragOffset)
         .contentShape(Rectangle())
+        .gesture(
+            DragGesture(minimumDistance: 10)
+                .onChanged { value in
+                    // Only allow upward drag with resistance
+                    if value.translation.height < 0 {
+                        dragOffset = value.translation.height * 0.3
+                    }
+                }
+                .onEnded { value in
+                    let velocity = value.predictedEndTranslation.height - value.translation.height
+                    
+                    // Open if dragged up far enough or with sufficient velocity
+                    if value.translation.height < -50 || velocity < -200 {
+                        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                            showingParkingDetails = true
+                            dragOffset = 0
+                        }
+                    } else {
+                        // Reset position
+                        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                            dragOffset = 0
+                        }
+                    }
+                }
+        )
         .onTapGesture {
             showingParkingDetails = true
         }
