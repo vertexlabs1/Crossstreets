@@ -30,6 +30,7 @@ A native iOS app for managing parking, floor selection, and history, with Supaba
 
 ## Testing
 - Run unit and UI tests from Xcode.
+- Tests are now functional and include basic initialization and UI tests.
 
 ## License
-[Specify your license here] 
+MIT License - see [LICENSE](LICENSE) file for details. 
