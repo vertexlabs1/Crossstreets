@@ -38,20 +38,19 @@ struct BottomCard: View {
         .gesture(
             DragGesture(minimumDistance: 20) // Require minimum distance to start
                 .onEnded { value in
-                    // Only allow gesture if there's a parked location
-                    guard locationManager.parkedLocation != nil else {
+                    // Only proceed if there's a parked location
+                    if locationManager.parkedLocation != nil {
+                        // Validate translation values to prevent NaN
+                        let translationHeight = value.translation.height.isFinite ? value.translation.height : 0
+                        let velocity = value.predictedEndTranslation.height - value.translation.height
+                        let velocityHeight = velocity.isFinite ? velocity : 0
+                        
+                        // Open if swiped up with sufficient distance or velocity
+                        if translationHeight < -40 || velocityHeight < -150 {
+                            showingParkingDetails = true
+                        }
+                    } else {
                         print("❌ Cannot show parking details via gesture - no parked location")
-                        return
-                    }
-                    
-                    // Validate translation values to prevent NaN
-                    let translationHeight = value.translation.height.isFinite ? value.translation.height : 0
-                    let velocity = value.predictedEndTranslation.height - value.translation.height
-                    let velocityHeight = velocity.isFinite ? velocity : 0
-                    
-                    // Open if swiped up with sufficient distance or velocity
-                    if translationHeight < -40 || velocityHeight < -150 {
-                        showingParkingDetails = true
                     }
                 }
         )
