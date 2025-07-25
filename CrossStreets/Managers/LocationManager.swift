@@ -17,7 +17,7 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
                 let distance = newLocation.distance(from: oldLocation)
                 if distance > 10 {
                     #if DEBUG
-                    print("📍 currentLocation: Updated (\(distance)m)")
+                    // Reduced logging frequency
                     #endif
                 }
             } else if currentLocation != nil {
@@ -34,23 +34,14 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     @Published var isOnline = true
     @Published var detectedGarageInfo: GarageDetectionResult? = nil {
         didSet {
-            #if DEBUG
-            print("🏢 detectedGarageInfo didSet triggered")
-            #endif
             // Throttle updates: only publish if value changed and at least 1s since last update
             let now = Date()
             if let old = oldValue, let new = detectedGarageInfo, old == new, now.timeIntervalSince(lastGarageInfoUpdate) < 1.0 {
-                #if DEBUG
-                print("🏢 detectedGarageInfo: Throttling update (same value, too soon)")
-                #endif
-                // Don't set detectedGarageInfo = old as it creates infinite loop
-                // Instead, just return and keep the new value
+                // Throttling update (same value, too soon)
                 return
             }
+            
             lastGarageInfoUpdate = now
-            #if DEBUG
-            print("🏢 detectedGarageInfo: Allowing update")
-            #endif
         }
     }
     private var lastGarageInfoUpdate: Date = .distantPast
@@ -1413,45 +1404,48 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     func updateParkingPhotos(_ photos: [UIImage]) {
         guard var currentParking = parkedLocation else { return }
         
-        // Create photos directory if it doesn't exist
-        let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-        let photosDirectory = documentsPath.appendingPathComponent("ParkingPhotos")
-        
-        do {
-            try FileManager.default.createDirectory(at: photosDirectory, withIntermediateDirectories: true)
-        } catch {
-            print("❌ Failed to create photos directory: \(error)")
-            return
-        }
-        
-        var photoPaths: [String] = []
-        
-        // Save each photo to file system
-        for (index, photo) in photos.enumerated() {
-            let fileName = "\(currentParking.id.uuidString)_\(index).jpg"
-            let fileURL = photosDirectory.appendingPathComponent(fileName)
+        // Move file operations to background queue
+        DispatchQueue.global(qos: .userInitiated).async {
+            // Create photos directory if it doesn't exist
+            let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+            let photosDirectory = documentsPath.appendingPathComponent("ParkingPhotos")
             
-            if let imageData = photo.jpegData(compressionQuality: 0.8) {
-                do {
-                    try imageData.write(to: fileURL)
-                    photoPaths.append(fileName)
-                    print("📸 Saved photo: \(fileName)")
-                } catch {
-                    print("❌ Failed to save photo: \(error)")
+            do {
+                try FileManager.default.createDirectory(at: photosDirectory, withIntermediateDirectories: true)
+            } catch {
+                print("❌ Failed to create photos directory: \(error)")
+                return
+            }
+            
+            var photoPaths: [String] = []
+            
+            // Save each photo to file system with compression
+            for (index, photo) in photos.enumerated() {
+                let fileName = "\(currentParking.id.uuidString)_\(index).jpg"
+                let fileURL = photosDirectory.appendingPathComponent(fileName)
+                
+                // Compress image to reduce file size and memory usage
+                if let imageData = photo.jpegData(compressionQuality: 0.6) {
+                    do {
+                        try imageData.write(to: fileURL)
+                        photoPaths.append(fileName)
+                    } catch {
+                        print("❌ Failed to save photo: \(error)")
+                    }
+                }
+            }
+            
+            // Update UI on main thread
+            DispatchQueue.main.async {
+                currentParking.photoPaths = photoPaths.isEmpty ? nil : photoPaths
+                self.parkedLocation = currentParking
+                
+                // Save to UserDefaults
+                if let parkingData = try? JSONEncoder().encode(currentParking) {
+                    UserDefaults.standard.set(parkingData, forKey: "parkedLocation")
                 }
             }
         }
-        
-        // Update parking location with photo paths
-        currentParking.photoPaths = photoPaths.isEmpty ? nil : photoPaths
-        parkedLocation = currentParking
-        
-        // Save to UserDefaults
-        if let parkingData = try? JSONEncoder().encode(currentParking) {
-            UserDefaults.standard.set(parkingData, forKey: "parkedLocation")
-        }
-        
-        print("📸 Updated parking photos: \(photoPaths.count) photos")
     }
     
     func loadParkingPhotos() -> [UIImage] {
@@ -1463,7 +1457,10 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
         
         var photos: [UIImage] = []
         
-        for photoPath in photoPaths {
+        // Limit the number of photos to prevent memory issues
+        let maxPhotos = min(photoPaths.count, 10)
+        
+        for (index, photoPath) in photoPaths.prefix(maxPhotos).enumerated() {
             let fileURL = photosDirectory.appendingPathComponent(photoPath)
             if let imageData = try? Data(contentsOf: fileURL),
                let image = UIImage(data: imageData) {

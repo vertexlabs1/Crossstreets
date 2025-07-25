@@ -8,6 +8,7 @@ struct ParkingDetailsSheet: View {
     @State private var notes: String = ""
     @State private var selectedPhotos: [PhotosPickerItem] = []
     @State private var parkingPhotos: [UIImage] = []
+    @FocusState private var isNotesFieldFocused: Bool
     
     var body: some View {
         NavigationView {
@@ -49,6 +50,7 @@ struct ParkingDetailsSheet: View {
                         TextField("Add a note about your parking spot...", text: $notes, axis: .vertical)
                             .textFieldStyle(.roundedBorder)
                             .lineLimit(3...6)
+                            .focused($isNotesFieldFocused)
                     }
                     .padding(.horizontal)
                     
@@ -142,11 +144,23 @@ struct ParkingDetailsSheet: View {
                         shareParkingLocation()
                     }
                 }
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button("Done") {
+                        isNotesFieldFocused = false
+                    }
+                }
             }
         }
         .onAppear {
             notes = parking.notes ?? ""
-            parkingPhotos = locationManager.loadParkingPhotos()
+            // Load photos asynchronously to prevent blocking
+            DispatchQueue.global(qos: .userInitiated).async {
+                let photos = locationManager.loadParkingPhotos()
+                DispatchQueue.main.async {
+                    parkingPhotos = photos
+                }
+            }
         }
         .onChange(of: selectedPhotos) { _, newPhotos in
             Task {

@@ -24,8 +24,8 @@ struct TimeAgoView: View {
     }
     
     private func startTimer() {
-        // Update every second for real-time counting
-        timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { _ in
+        // Update every 30 seconds instead of every second to reduce performance impact
+        timer = Timer.scheduledTimer(withTimeInterval: 30.0, repeats: true) { _ in
             updateTimeAgo()
         }
     }
@@ -143,34 +143,31 @@ struct ParkedStateView: View {
                         locationManager.getDirectionsToParkedCar()
                     }) {
                         HStack {
-                            Image(systemName: "location.fill")
-                                .font(.system(size: 16))
+                            Image(systemName: "paperplane.fill")
+                                .font(.system(size: 14, weight: .semibold))
                             Text("Get Directions")
-                                .font(.system(size: 16, weight: .semibold))
+                                .font(.system(size: 15, weight: .semibold))
                         }
                         .foregroundColor(.white)
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 15)
+                        .padding(.vertical, 12)
                         .background(Color.blue)
-                        .cornerRadius(12)
-                    }
-                    Button(action: {
-                        HapticManager.mediumImpact()
-                        Task { @MainActor in
-                            withAnimation {
-                                locationManager.clearParkedLocation()
-                            }
-                        }
-                    }) {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 18, weight: .semibold))
-                            .foregroundColor(.white)
-                            .frame(width: 50, height: 50)
-                            .background(Color.red.opacity(0.9))
-                            .cornerRadius(12)
+                        .cornerRadius(10)
                     }
                     .buttonStyle(PlainButtonStyle())
-                    .contentShape(Rectangle())
+                    
+                    Button(action: {
+                        HapticManager.mediumImpact()
+                        locationManager.clearParkedLocation()
+                    }) {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundColor(.white)
+                            .frame(width: 44, height: 44)
+                            .background(Color.red)
+                            .clipShape(Circle())
+                    }
+                    .buttonStyle(PlainButtonStyle())
                 }
             }
             .padding(.horizontal, 20)
