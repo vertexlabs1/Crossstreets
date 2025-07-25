@@ -84,6 +84,20 @@ struct ContentView: View {
                     centerMapOnUser(location: location)
                 }
             }
+            .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
+                print("🔄 App will enter foreground - refreshing location permissions")
+                // Refresh location permissions when app comes back from background
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    locationManager.refreshLocationPermissions()
+                }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
+                print("🔄 App did become active - ensuring location services are running")
+                // Ensure location services are properly running
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    locationManager.ensureLocationServicesRunning()
+                }
+            }
             
             VStack {
                 Spacer()

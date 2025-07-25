@@ -98,18 +98,10 @@ struct CrossStreetsApp: App {
                 stopNetworkMonitoring()
             }
             .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
-                print("🔄 App will enter foreground - refreshing location permissions")
-                // Refresh location permissions when app comes back from background
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                    LocationManager.shared.refreshLocationPermissions()
-                }
+                print("🔄 App will enter foreground - location refresh will be handled by ContentView")
             }
             .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
-                print("🔄 App did become active - ensuring location services are running")
-                // Ensure location services are properly running
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                    LocationManager.shared.ensureLocationServicesRunning()
-                }
+                print("🔄 App did become active - location services will be refreshed by ContentView")
             }
             .onOpenURL { url in
                 handleDeepLink(url: url)
