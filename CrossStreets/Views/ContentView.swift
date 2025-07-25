@@ -140,7 +140,7 @@ struct ContentView: View {
                 .padding(.horizontal, 16)
                 .background(
                     Color(.systemBackground)
-                        .cornerRadius(28, corners: [.topLeft, .topRight])
+                        .cornerRadius(28, corners: [UIRectCorner.topLeft, UIRectCorner.topRight])
                         .shadow(color: .black.opacity(0.1), radius: 25, y: -10)
                         .edgesIgnoringSafeArea(.bottom)
                 )

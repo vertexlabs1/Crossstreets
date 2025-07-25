@@ -2,6 +2,8 @@ import SwiftUI
 
 struct BottomCard: View {
     @ObservedObject var locationManager: LocationManager
+    @Binding var showingFloorPicker: Bool
+    @Binding var detectedGarageName: String?
     @State private var showingParkingDetails = false
     
     var body: some View {
@@ -15,14 +17,22 @@ struct BottomCard: View {
             
             Group {
                 if let parkedLocation = locationManager.parkedLocation {
-                    ParkedStateView(locationManager: locationManager, parking: parkedLocation)
+                    ParkedStateView(
+                        locationManager: locationManager,
+                        showingFloorPicker: $showingFloorPicker,
+                        detectedGarageName: $detectedGarageName
+                    )
                 } else {
-                    NotParkedStateView(locationManager: locationManager)
+                    NotParkedStateView(
+                        locationManager: locationManager,
+                        detectedGarageName: $detectedGarageName,
+                        showingFloorPicker: $showingFloorPicker
+                    )
                 }
             }
         }
         .background(Color(.systemBackground))
-        .cornerRadius(20, corners: [.topLeft, .topRight])
+        .cornerRadius(20, corners: [UIRectCorner.topLeft, UIRectCorner.topRight])
         .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: -5)
         .contentShape(Rectangle()) // Make entire area tappable
         .gesture(
@@ -54,5 +64,9 @@ struct BottomCard: View {
 }
 
 #Preview {
-    BottomCard(locationManager: LocationManager(), showingFloorPicker: .constant(false), detectedGarageName: .constant(nil))
+    BottomCard(
+        locationManager: LocationManager(),
+        showingFloorPicker: .constant(false),
+        detectedGarageName: .constant(nil)
+    )
 }
