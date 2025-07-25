@@ -2,44 +2,46 @@ import SwiftUI
 import MapKit
 
 struct ContentView: View {
-    let locationManager: LocationManager
+    @StateObject private var locationManager = LocationManager()
     @State private var position: MapCameraPosition = .automatic
     @State private var showingFloorPicker = false
     @State private var detectedGarageName: String?
     @State private var selectedTab = 0
 
-    // --- New state for sheets ---
+    // New state for sheets
     @State private var showSettingsSheet = false
     @State private var showHistorySheet = false
-    // ---
-    // --- Error handling ---
+    
+    // Error handling
     @State private var showErrorAlert = false
     @State private var errorMessage = ""
-    // Network status handled at app level - removed environment dependency
-    // ---
-    // --- Deep link handling ---
+    
+    // Deep link handling
     @Binding var deepLinkDestination: String?
-    // ---
-    // --- Prevent multiple logging ---
+    
+    // Prevent multiple logging
     @State private var hasLoggedInitialization = false
-    // ---
+    
     // Throttle for detectedGarageInfo updates
     @State private var lastGarageInfoUpdate: Date = Date.distantPast
     
     // Only print initialization log once per app launch
     static var hasPrintedInit = false
     
-    init(locationManager: LocationManager, deepLinkDestination: Binding<String?> = .constant(nil)) {
-        self.locationManager = locationManager
+    init(deepLinkDestination: Binding<String?> = .constant(nil)) {
         self._deepLinkDestination = deepLinkDestination
         if !ContentView.hasPrintedInit {
+            #if DEBUG
             print("🚀 ContentView initialized at \(Date())")
+            #endif
             ContentView.hasPrintedInit = true
         }
     }
     
     var body: some View {
+        #if DEBUG
         let _ = print("🗺️ ContentView body computed")
+        #endif
         ZStack {
             Map(position: $position) {
                 UserAnnotation()
@@ -56,46 +58,22 @@ struct ContentView: View {
             }
             .ignoresSafeArea()
             .onAppear {
+                #if DEBUG
                 print("🗺️ Map view appeared at \(Date())")
+                #endif
                 // Only log once per session
                 if !hasLoggedInitialization {
                     hasLoggedInitialization = true
-                    SupabaseManager.shared.logUserAction(
-                        action: "map_appeared",
-                        screen: "main",
-                        success: true
-                    ) { _ in }
+                    PerformanceMonitor.shared.startAction("app_launch", screen: "main")
                 }
             }
-            // REMOVED: This onChange was causing infinite loops
-            // Garage detection is now handled directly in the location manager
-            
-            VStack {
-                HeaderView()
-                Spacer()
+            .onChange(of: locationManager.currentLocation) { _, newLocation in
+                if let location = newLocation {
+                    centerMapOnUser(location: location)
+                }
             }
             
             VStack {
-                Spacer()
-                HStack {
-                    Spacer()
-                    Button(action: centerOnUserLocation) {
-                        Image(systemName: "location")
-                            .font(.system(size: 18, weight: .medium))
-                            .foregroundColor(.white)
-                            .frame(width: 40, height: 40)
-                            .background(
-                                Circle()
-                                    .fill(Color.black.opacity(0.8))
-                                    .shadow(color: .black.opacity(0.4), radius: 8, y: 4)
-                            )
-                    }
-                }
-                .padding(.trailing, 20)
-                .padding(.bottom, 250)
-            }
-            
-            VStack(spacing: 0) {
                 Spacer()
                 
                 VStack(spacing: 0) {
@@ -130,95 +108,48 @@ struct ContentView: View {
                 .transition(.move(edge: .bottom).combined(with: .opacity))
                 .zIndex(2)
             }
-            
         }
-        .sheet(isPresented: $showSettingsSheet, onDismiss: { 
-            selectedTab = 0
-            showSettingsSheet = false
-        }) {
-            SettingsView(locationManager: locationManager, selectedTab: $selectedTab)
-                .presentationDetents([.medium, .large])
-        }
-        .sheet(isPresented: $showHistorySheet, onDismiss: { 
-            selectedTab = 0
-            showHistorySheet = false
-        }) {
+        .sheet(isPresented: $showHistorySheet) {
             HistoryView(locationManager: locationManager, selectedTab: $selectedTab)
-                .presentationDetents([.medium, .large])
         }
-        // Tab changes handled directly in TabBarView - removed onChange to prevent circular dependency
-        .animation(.spring(dampingFraction: 0.8), value: showingFloorPicker)
-        .animation(.easeInOut(duration: 0.2), value: selectedTab)
-        .onAppear {
-            locationManager.requestLocationPermission()
-            
-            // Log view initialization only once
-            if !hasLoggedInitialization {
-                hasLoggedInitialization = true
-                SupabaseManager.shared.logUserAction(
-                    action: "view_initialized",
-                    screen: "main",
-                    success: true,
-                    context: ["view": "ContentView"]
-                ) { _ in }
-            }
-        }
-        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("GoBackToParking"))) { _ in
-            withAnimation(.easeOut(duration: 0.3)) {
-                selectedTab = 0
-            }
+        .sheet(isPresented: $showSettingsSheet) {
+            SettingsView(locationManager: locationManager, selectedTab: $selectedTab)
         }
         .alert("Error", isPresented: $showErrorAlert) {
             Button("OK") { }
         } message: {
             Text(errorMessage)
         }
-        // Network status handled at app level - removed onChange
-        // REMOVE: This onChange might be causing the loop
-        // .onChange(of: deepLinkDestination) { oldValue, destination in
-        //     if let destination = destination {
-        //         // Handle deep link
-        //         switch destination {
-        //         case "parking":
-        //             // Widget tapped - ensure we're on the main parking view
-        //             selectedTab = 0
-        //             // Center on parked location if available
-        //             if let parkedLocation = locationManager.parkedLocation {
-        //                 withAnimation(.easeInOut(duration: 0.8)) {
-        //                     position = .region(MKCoordinateRegion(
-        //                         center: parkedLocation.coordinate,
-        //                         span: MKCoordinateSpan(latitudeDelta: 0.005, longitudeDelta: 0.005)
-        //                     ))
-        //                 }
-        //             }
-        //         default:
-        //             break
-        //         }
-        //         // Clear the deep link destination
-        //         deepLinkDestination = nil
-        //     }
-        // }
-        .alert("Location Error", isPresented: Binding<Bool>(
-            get: { locationManager.locationPermissionError != nil },
-            set: { newValue in
-                if !newValue { locationManager.locationPermissionError = nil }
-            })
-        ) {
-            Button("OK") { locationManager.locationPermissionError = nil }
-        } message: {
-            Text(locationManager.locationPermissionError ?? "")
+        .onAppear {
+            // Request location permission on app launch
+            locationManager.requestLocationPermission()
+        }
+        .onChange(of: locationManager.detectedGarageInfo) { _, newGarageInfo in
+            // Throttle updates to prevent excessive view rebuilds
+            let now = Date()
+            if now.timeIntervalSince(lastGarageInfoUpdate) >= 1.0 {
+                lastGarageInfoUpdate = now
+                detectedGarageName = newGarageInfo?.garageName
+                
+                if newGarageInfo?.isInGarage == true {
+                    withAnimation(.easeInOut(duration: 0.3)) {
+                        showingFloorPicker = true
+                    }
+                }
+            }
+        }
+        .onChange(of: locationManager.locationPermissionError) { _, error in
+            if let error = error {
+                errorMessage = error
+                showErrorAlert = true
+            }
         }
     }
     
-
-    
-    private func centerOnUserLocation() {
-        guard let location = locationManager.currentLocation else { return }
-        
+    private func centerMapOnUser(location: CLLocation) {
         // Start performance monitoring
-        PerformanceMonitor.shared.startAction("center_on_user")
+        PerformanceMonitor.shared.startAction("center_on_user", screen: "main")
         
-        HapticManager.lightImpact()
         withAnimation(.easeInOut(duration: 0.8)) {
             position = .region(MKCoordinateRegion(
                 center: location.coordinate,
@@ -234,5 +165,6 @@ struct ContentView: View {
 }
 
 #Preview {
-    ContentView(locationManager: LocationManager())
+    ContentView()
 }
+

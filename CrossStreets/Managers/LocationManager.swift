@@ -11,7 +11,7 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     // MARK: - Properties
     @Published var currentLocation: CLLocation? {
         didSet {
-            // SIMPLE FIX: Only log significant location changes to prevent spam
+            // Only log significant location changes to prevent spam
             if let newLocation = currentLocation,
                let oldLocation = oldValue {
                 let distance = newLocation.distance(from: oldLocation)
@@ -43,7 +43,7 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
                 #if DEBUG
                 print("🏢 detectedGarageInfo: Throttling update (same value, too soon)")
                 #endif
-                // CRITICAL FIX: Don't set detectedGarageInfo = old as it creates infinite loop
+                // Don't set detectedGarageInfo = old as it creates infinite loop
                 // Instead, just return and keep the new value
                 return
             }
@@ -67,7 +67,7 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     private let altimeter = CMAltimeter()
     @Published var barometricAltitude: Double? {
         didSet {
-            // SIMPLE FIX: Only log significant changes to prevent spam
+            // Only log significant changes to prevent spam
             if let newValue = barometricAltitude,
                let oldValue = oldValue {
                 let difference = abs(newValue - oldValue)
@@ -147,7 +147,7 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     private func setupLocationManager() {
         locationManager.delegate = self
         locationManager.desiredAccuracy = kCLLocationAccuracyNearestTenMeters
-        locationManager.distanceFilter = 100 // CRITICAL FIX: Increased to prevent tiny movements from triggering updates
+        locationManager.distanceFilter = 100 // Increased to prevent tiny movements from triggering updates
         locationManager.allowsBackgroundLocationUpdates = false
         locationManager.pausesLocationUpdatesAutomatically = true
     }
@@ -172,7 +172,7 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
                 return
             }
             
-            // FIX: Throttle updates to prevent excessive view rebuilds
+            // Throttle updates to prevent excessive view rebuilds
             DispatchQueue.main.async {
                 let now = Date()
                 guard now.timeIntervalSince(self?.lastBarometricUpdate ?? .distantPast) > 2.0 else { return }
@@ -361,7 +361,7 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
             
-            // SIMPLE FIX: Only update if location is significantly different
+            // Only update if location is significantly different
             if let currentLocation = self.currentLocation {
                 let distance = location.distance(from: currentLocation)
                 if distance < 5.0 { // Only update if moved more than 5 meters
@@ -1180,16 +1180,10 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     
     // Network monitoring removed - using shared status from app level
     
-    // Debug method to test location manager functionality
+    // Test method to verify location manager functionality
     func debugLocationStatus() {
+        #if DEBUG
         print("🔍 DEBUG: Location Manager Status")
-        print("📍 Current Location: \(currentLocation?.coordinate.latitude ?? 0), \(currentLocation?.coordinate.longitude ?? 0)")
-        print("📍 Location Accuracy: \(currentLocation?.horizontalAccuracy ?? 0)m")
-        print("📍 Is Location Enabled: \(isLocationEnabled)")
-        print("📍 Authorization Status: \(authorizationStatus.rawValue)")
-        print("📍 Location Services Enabled: \(CLLocationManager.locationServicesEnabled())")
-        print("📍 Is Detecting Parking: \(isDetectingParking)")
-        print("📍 Parked Location: \(parkedLocation?.address ?? "None")")
-        print("📡 Network Status: \(isOnline ? "Online" : "Offline")")
+        #endif
     }
 }
