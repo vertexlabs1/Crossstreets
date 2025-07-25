@@ -1486,7 +1486,7 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
         // If we have authorization, restart location services
         if status == .authorizedWhenInUse || status == .authorizedAlways {
             print("✅ Location authorized - restarting services")
-            startLocationServices()
+            locationManager.startUpdatingLocation()
         } else if status == .denied || status == .restricted {
             print("❌ Location access denied or restricted")
             // Don't show alert here - let the user handle it in settings
@@ -1499,17 +1499,18 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     func ensureLocationServicesRunning() {
         print("🔄 Ensuring location services are running...")
         
-        // Check if location manager is running
-        if !locationManager.isUpdatingLocation {
+        // Check if location manager is running by checking if we have recent location updates
+        let timeSinceLastUpdate = Date().timeIntervalSince(lastLocationUpdate)
+        if timeSinceLastUpdate > 30.0 { // If no updates in 30 seconds, restart
             print("⚠️ Location manager not updating - restarting")
-            startLocationServices()
+            locationManager.startUpdatingLocation()
         } else {
             print("✅ Location services are running")
         }
         
         // Check if altimeter is running (if available)
-        if CMAltimeter.isRelativeAltitudeAvailable() && !isAltimeterRunning {
-            print("⚠️ Altimeter not running - restarting")
+        if CMAltimeter.isRelativeAltitudeAvailable() {
+            print("✅ Altimeter available - ensuring it's running")
             startAltimeter()
         }
     }
