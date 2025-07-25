@@ -175,7 +175,7 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
             // Throttle updates to prevent excessive view rebuilds
             DispatchQueue.main.async {
                 let now = Date()
-                guard now.timeIntervalSince(self?.lastBarometricUpdate ?? .distantPast) > 5.0 else { return }
+                guard now.timeIntervalSince(self?.lastBarometricUpdate ?? .distantPast) > 10.0 else { return }
                 
                 self?.barometricAltitude = data.relativeAltitude.doubleValue
                 self?.barometricPressure = data.pressure.doubleValue

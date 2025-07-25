@@ -25,7 +25,10 @@ struct CrossStreetsApp: App {
                 // Splash overlay - only shown when showSplash is true
                 if showSplash {
                     SplashView()
-                        .transition(.opacity.combined(with: .scale(scale: 1.05)))
+                        .transition(.asymmetric(
+                            insertion: .opacity.combined(with: .scale(scale: 1.05)),
+                            removal: .opacity.combined(with: .scale(scale: 1.1))
+                        ))
                         .zIndex(1)
                         .onAppear {
                             print("🎬 Splash screen appeared, will dismiss in 2 seconds")
@@ -33,7 +36,7 @@ struct CrossStreetsApp: App {
                             // Start fade out after 2 seconds
                             DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
                                 print("⏰ Splash screen timer fired, dismissing...")
-                                withAnimation(.easeInOut(duration: 0.8)) {
+                                withAnimation(.easeInOut(duration: 1.2)) {
                                     showSplash = false
                                     print("✅ Splash screen dismissed (showSplash = false)")
                                 }
@@ -85,7 +88,7 @@ struct CrossStreetsApp: App {
                     print("🔄 Fallback timer fired, showSplash: \(showSplash)")
                     if showSplash {
                         print("🔄 Fallback splash dismissal triggered")
-                        withAnimation(.easeInOut(duration: 0.8)) {
+                        withAnimation(.easeInOut(duration: 1.2)) {
                             showSplash = false
                             print("✅ Fallback splash screen dismissed")
                         }
