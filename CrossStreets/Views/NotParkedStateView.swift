@@ -26,7 +26,9 @@ struct NotParkedStateView: View {
                 PerformanceMonitor.shared.startAction("park_here_button")
                 
                 // Add immediate visual feedback
+                #if DEBUG
                 print("🔍 DEBUG: Park Here button pressed!")
+                #endif
                 isButtonPressed = true
                 hasCompletedDetection = false
                 HapticManager.lightImpact()
@@ -37,7 +39,9 @@ struct NotParkedStateView: View {
                 }
                 
                 detectedGarageName = nil
+                #if DEBUG
                 print("🔍 DEBUG: About to call locationManager.detectParkingType()")
+                #endif
                 locationManager.detectParkingType()
                 
                 // End performance monitoring after detection starts

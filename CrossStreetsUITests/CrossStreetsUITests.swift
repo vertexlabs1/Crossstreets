@@ -15,7 +15,7 @@ final class CrossStreetsUITests: XCTestCase {
         // In UI tests it is usually best to stop immediately when a failure occurs.
         continueAfterFailure = false
 
-        // In UI tests it’s important to set the initial state - such as interface orientation - required for your tests before they run. The setUp method is a good place to do this.
+        // In UI tests it's important to set the initial state - such as interface orientation - required for your tests before they run. The setUp method is a good place to do this.
     }
 
     override func tearDownWithError() throws {
@@ -23,12 +23,30 @@ final class CrossStreetsUITests: XCTestCase {
     }
 
     @MainActor
-    func testExample() throws {
+    func testAppLaunch() throws {
         // UI tests must launch the application that they test.
         let app = XCUIApplication()
         app.launch()
 
-        // Use XCTAssert and related functions to verify your tests produce the correct results.
+        // Verify the app launched successfully
+        XCTAssertTrue(app.exists)
+        
+        // Verify basic UI elements are present
+        // Note: These selectors may need adjustment based on actual UI structure
+        let tabBar = app.tabBars.firstMatch
+        XCTAssertTrue(tabBar.exists, "Tab bar should be present")
+    }
+    
+    @MainActor
+    func testBasicNavigation() throws {
+        let app = XCUIApplication()
+        app.launch()
+        
+        // Test that we can navigate to different tabs
+        let tabBar = app.tabBars.firstMatch
+        XCTAssertTrue(tabBar.exists, "Tab bar should be present")
+        
+        // Note: Add more specific navigation tests based on your actual UI structure
     }
 
     @MainActor

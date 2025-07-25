@@ -16,10 +16,14 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
                let oldLocation = oldValue {
                 let distance = newLocation.distance(from: oldLocation)
                 if distance > 10 {
+                    #if DEBUG
                     print("📍 currentLocation: Updated (\(distance)m)")
+                    #endif
                 }
             } else if currentLocation != nil {
+                #if DEBUG
                 print("📍 currentLocation: First location set")
+                #endif
             }
         }
     }
@@ -30,17 +34,23 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     @Published var isOnline = true
     @Published var detectedGarageInfo: GarageDetectionResult? = nil {
         didSet {
+            #if DEBUG
             print("🏢 detectedGarageInfo didSet triggered")
+            #endif
             // Throttle updates: only publish if value changed and at least 1s since last update
             let now = Date()
             if let old = oldValue, let new = detectedGarageInfo, old == new, now.timeIntervalSince(lastGarageInfoUpdate) < 1.0 {
+                #if DEBUG
                 print("🏢 detectedGarageInfo: Throttling update (same value, too soon)")
+                #endif
                 // CRITICAL FIX: Don't set detectedGarageInfo = old as it creates infinite loop
                 // Instead, just return and keep the new value
                 return
             }
             lastGarageInfoUpdate = now
+            #if DEBUG
             print("🏢 detectedGarageInfo: Allowing update")
+            #endif
         }
     }
     private var lastGarageInfoUpdate: Date = .distantPast
@@ -62,10 +72,14 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
                let oldValue = oldValue {
                 let difference = abs(newValue - oldValue)
                 if difference > 1.0 { // Only log if altitude changed by more than 1 meter
+                    #if DEBUG
                     print("📊 barometricAltitude: Updated (\(difference)m)")
+                    #endif
                 }
             } else if barometricAltitude != nil {
+                #if DEBUG
                 print("📊 barometricAltitude: First reading set")
+                #endif
             }
         }
     }
@@ -459,12 +473,16 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
             let detectionDuration = Date().timeIntervalSince(detectionStartTime)
             
             if isInGarage {
+                #if DEBUG
                 print("🏢 Quick check: Found garage '\(garageName ?? "Unknown")' - showing floor picker")
+                #endif
                 self.detectedGarageInfo = GarageDetectionResult(isInGarage: true, garageName: garageName)
                 PerformanceMonitor.shared.endAction("garage_detection", screen: "main", success: true, context: ["garage_name": garageName ?? "unknown"])
                 PerformanceMonitor.shared.logGarageDetectionTime(detectionDuration, success: true)
             } else {
+                #if DEBUG
                 print("🚗 Quick check: No obvious garage - parking normally")
+                #endif
                 self.saveParkedLocation(floor: nil)
                 self.detectedGarageInfo = GarageDetectionResult(isInGarage: false, garageName: nil)
                 PerformanceMonitor.shared.endAction("garage_detection", screen: "main", success: false, context: ["no_garage": true])
@@ -714,12 +732,22 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
                     completion(true, formattedName)
                     return
                 } else {
+                    #if DEBUG
                     print("❌ Garage '\(item.name ?? "unnamed")' rejected:")
+                    #endif
+                    #if DEBUG
                     print("   - Distance: \(distance)m (max 100m)")
+                    #endif
+                    #if DEBUG
                     print("   - Accuracy: \(location.horizontalAccuracy)m (max 25m)")
+                    #endif
+                    #if DEBUG
                     print("   - Is real garage: \(isRealGarage)")
+                    #endif
                     if hasAltitudeData {
+                        #if DEBUG
                         print("   - Altitude: \(location.altitude)m (accuracy: \(location.verticalAccuracy)m)")
+                        #endif
                     }
                 }
             }
@@ -785,7 +813,9 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
             print("❌ saveParkedLocation: No current location available")
             return 
         }
+        #if DEBUG
         print("📍 saveParkedLocation: Starting with location \(location.coordinate)")
+        #endif
         let garageName = detectedGarageInfo?.garageName
         let parkingLocation = ParkingLocation(
             id: UUID(),
@@ -800,9 +830,13 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
         HapticManager.mediumImpact()
         
         // Get the smart address with better loading state
+        #if DEBUG
         print("📍 saveParkedLocation: Starting address resolution...")
+        #endif
         getSmartAddress(for: location.coordinate) { [weak self] address in
+            #if DEBUG
             print("📍 saveParkedLocation: Address resolved: \(address)")
+            #endif
             DispatchQueue.main.async {
                 let updatedLocation = ParkingLocation(
                     id: parkingLocation.id,
@@ -815,7 +849,9 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
                 )
                 self?.setParkedLocation(updatedLocation)
                 self?.saveToUserDefaults(updatedLocation)
+                #if DEBUG
                 print("📍 saveParkedLocation: Updated parking location with address")
+                #endif
             }
         }
     }
@@ -851,22 +887,30 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     }
     
     func clearParkedLocation() {
+        #if DEBUG
         print("🗑️ clearParkedLocation: Starting...")
+        #endif
         setParkedLocation(nil)
         UserDefaults.standard.removeObject(forKey: "parkedLocation")
         
         // Handle app group UserDefaults with error handling
         if let sharedDefaults = UserDefaults(suiteName: "group.CC3YTPPQQJ.crossstreets") {
             sharedDefaults.removeObject(forKey: "parkedLocation")
+            #if DEBUG
             print("🗑️ clearParkedLocation: Cleared shared UserDefaults")
+            #endif
         } else {
+            #if DEBUG
             print("⚠️ clearParkedLocation: Could not access shared UserDefaults")
+            #endif
         }
         
         detectedGarageInfo = nil
         isDetectingParking = false
         HapticManager.lightImpact()
+        #if DEBUG
         print("🗑️ clearParkedLocation: Completed")
+        #endif
     }
     
     func getDirectionsToParkedCar() {
@@ -885,12 +929,18 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
             // Handle app group UserDefaults with error handling
             if let sharedDefaults = UserDefaults(suiteName: "group.CC3YTPPQQJ.crossstreets") {
                 sharedDefaults.set(encoded, forKey: "parkedLocation")
+                #if DEBUG
                 print("💾 saveToUserDefaults: Saved to shared UserDefaults")
+                #endif
             } else {
+                #if DEBUG
                 print("⚠️ saveToUserDefaults: Could not access shared UserDefaults")
+                #endif
             }
         } else {
+            #if DEBUG
             print("❌ saveToUserDefaults: Failed to encode parking location")
+            #endif
         }
     }
     
@@ -925,7 +975,9 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     
     func logUserIssue(notes: String, issueType: String = "general_issue") {
         guard let currentLocation = currentLocation else {
+            #if DEBUG
             print("⚠️ Cannot log issue: No current location available")
+            #endif
             return
         }
         
@@ -935,7 +987,9 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
             let address = placemarks?.first?.name ?? "Unknown location"
             
             DispatchQueue.main.async {
+                #if DEBUG
                 print("✅ Logged user issue: \(notes)")
+                #endif
                 
                 // Send to Supabase for real-time analytics
                 SupabaseManager.shared.logUserIssue(
@@ -945,9 +999,13 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
                     address: address
                 ) { success in
                     if success {
+                        #if DEBUG
                         print("✅ Supabase: Issue synced successfully")
+                        #endif
                     } else {
+                        #if DEBUG
                         print("⚠️ Supabase: Issue queued for later sync")
+                        #endif
                     }
                 }
             }
@@ -979,7 +1037,9 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
         
         // Validate altitude data quality
         guard isValidAltitude(altitude, source: altitudeSource, location: location) else {
+            #if DEBUG
             print("⚠️ Poor altitude data quality - skipping floor detection")
+            #endif
             return nil
         }
         
@@ -993,13 +1053,17 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     private func isValidAltitude(_ altitude: Double, source: String, location: CLLocation) -> Bool {
         // Check for reasonable altitude values
         guard altitude > -1000 && altitude < 10000 else {
+            #if DEBUG
             print("⚠️ Altitude out of reasonable range: \(altitude)m")
+            #endif
             return false
         }
         
         // Check GPS accuracy if using GPS altitude
         if source == "gps" && location.verticalAccuracy > 20 {
+            #if DEBUG
             print("⚠️ Poor GPS vertical accuracy: \(location.verticalAccuracy)m")
+            #endif
             return false
         }
         

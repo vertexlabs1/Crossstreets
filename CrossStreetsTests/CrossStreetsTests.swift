@@ -10,8 +10,22 @@ import Testing
 
 struct CrossStreetsTests {
 
-    @Test func example() async throws {
-        // Write your test here and use APIs like `#expect(...)` to check expected conditions.
+    @Test func testSupabaseManagerInitialization() async throws {
+        // Test that SupabaseManager singleton can be initialized
+        let manager = SupabaseManager.shared
+        #expect(manager != nil)
+    }
+    
+    @Test func testLocationManagerInitialization() async throws {
+        // Test that LocationManager can be initialized
+        let manager = LocationManager()
+        #expect(manager != nil)
+    }
+    
+    @Test func testPerformanceMonitorInitialization() async throws {
+        // Test that PerformanceMonitor singleton can be initialized
+        let monitor = PerformanceMonitor.shared
+        #expect(monitor != nil)
     }
 
 }

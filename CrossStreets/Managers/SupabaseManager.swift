@@ -45,7 +45,9 @@ class SupabaseManager: ObservableObject {
                     // Data is valid, keep it
                 } else {
                     // If it's invalid, remove it
+                    #if DEBUG
                     print("🧹 Cleaning up invalid UserDefaults key: \(key)")
+                    #endif
                     UserDefaults.standard.removeObject(forKey: key)
                 }
             }
@@ -60,7 +62,9 @@ class SupabaseManager: ObservableObject {
     
     func logUserIssue(notes: String, issueType: String, location: CLLocationCoordinate2D, address: String, completion: @escaping (Bool) -> Void) {
         guard isOnline else {
+            #if DEBUG
             print("⚠️ Supabase: Offline - queuing issue for later sync")
+            #endif
             queueIssueForLaterSync(notes: notes, issueType: issueType, location: location, address: address)
             completion(false)
             return
@@ -81,9 +85,13 @@ class SupabaseManager: ObservableObject {
             DispatchQueue.main.async {
                 if success {
                     self?.lastSyncTime = Date()
+                    #if DEBUG
                     print("✅ Supabase: Issue logged successfully")
+                    #endif
                 } else {
+                    #if DEBUG
                     print("❌ Supabase: Failed to log issue")
+                    #endif
                 }
                 completion(success)
             }
@@ -120,9 +128,13 @@ class SupabaseManager: ObservableObject {
         
         sendRequest(endpoint: "/rest/v1/floor_corrections", method: "POST", data: data) { success in
             if success {
+                #if DEBUG
                 print("✅ Supabase: Floor correction logged successfully")
+                #endif
             } else {
+                #if DEBUG
                 print("⚠️ Supabase: Floor correction queued for later sync")
+                #endif
                 // Queue for later sync if needed
                 self.queueFloorCorrection(data)
             }
@@ -151,9 +163,13 @@ class SupabaseManager: ObservableObject {
         
         sendRequest(endpoint: "/rest/v1/performance_metrics", method: "POST", data: data) { success in
             if success {
+                #if DEBUG
                 print("📊 Supabase: Performance metric logged: \(metricName) = \(value) \(unit)")
+                #endif
             } else {
+                #if DEBUG
                 print("⚠️ Supabase: Performance metric queued for later sync")
+                #endif
                 self.queuePerformanceMetric(data)
             }
             completion(success)
@@ -180,9 +196,13 @@ class SupabaseManager: ObservableObject {
         
         sendRequest(endpoint: "/rest/v1/error_logs", method: "POST", data: data) { success in
             if success {
+                #if DEBUG
                 print("🚨 Supabase: Error logged: \(errorType) - \(errorMessage)")
+                #endif
             } else {
+                #if DEBUG
                 print("⚠️ Supabase: Error queued for later sync")
+                #endif
                 self.queueErrorLog(data)
             }
             completion(success)
@@ -211,9 +231,13 @@ class SupabaseManager: ObservableObject {
         
         sendRequest(endpoint: "/rest/v1/user_actions", method: "POST", data: data) { success in
             if success {
+                #if DEBUG
                 print("👤 Supabase: User action logged: \(action) on \(screen) (\(success ? "✅" : "❌"))")
+                #endif
             } else {
+                #if DEBUG
                 print("⚠️ Supabase: User action queued for later sync")
+                #endif
                 self.queueUserAction(data)
             }
             completion(success)
@@ -224,7 +248,9 @@ class SupabaseManager: ObservableObject {
     
     private func sendRequest(endpoint: String, method: String, data: [String: Any], completion: @escaping (Bool) -> Void) {
         guard let url = URL(string: baseURL + endpoint) else {
+            #if DEBUG
             print("❌ Supabase: Invalid URL")
+            #endif
             completion(false)
             return
         }
@@ -236,10 +262,12 @@ class SupabaseManager: ObservableObject {
         request.setValue(apiKey, forHTTPHeaderField: "apikey")
         
         // Debug: Log the request headers (without exposing API key)
+        #if DEBUG
         print("📤 Supabase: Request headers:")
         print("  - Authorization: Bearer [REDACTED]")
         print("  - apikey: [REDACTED]")
         print("  - Content-Type: \(request.value(forHTTPHeaderField: "Content-Type") ?? "nil")")
+        #endif
         
         // Wrap data in array as Supabase expects
         let requestBody = [data]
@@ -248,18 +276,24 @@ class SupabaseManager: ObservableObject {
             request.httpBody = try JSONSerialization.data(withJSONObject: requestBody)
             
             // Debug: Log the request data
+            #if DEBUG
             if let httpBody = request.httpBody, let jsonString = String(data: httpBody, encoding: .utf8) {
                 print("📤 Supabase: Sending to \(endpoint): \(jsonString)")
             }
+            #endif
         } catch {
+            #if DEBUG
             print("❌ Supabase: JSON serialization failed: \(error)")
+            #endif
             completion(false)
             return
         }
         
         let task = URLSession.shared.dataTask(with: request) { data, response, error in
             if let error = error {
+                #if DEBUG
                 print("❌ Supabase: Network error: \(error)")
+                #endif
                 completion(false)
                 return
             }
@@ -267,13 +301,17 @@ class SupabaseManager: ObservableObject {
             if let httpResponse = response as? HTTPURLResponse {
                 let success = (200...299).contains(httpResponse.statusCode)
                 if !success {
+                    #if DEBUG
                     print("❌ Supabase: HTTP \(httpResponse.statusCode)")
                     // Log response body for debugging
                     if let data = data, let responseString = String(data: data, encoding: .utf8) {
                         print("❌ Supabase: Response body: \(responseString)")
                     }
+                    #endif
                 } else {
+                    #if DEBUG
                     print("✅ Supabase: Request successful")
+                    #endif
                 }
                 completion(success)
             } else {
@@ -308,7 +346,9 @@ class SupabaseManager: ObservableObject {
         var queuedCorrections = UserDefaults.standard.array(forKey: "queuedFloorCorrections") as? [[String: Any]] ?? []
         queuedCorrections.append(plistData)
         UserDefaults.standard.set(queuedCorrections, forKey: "queuedFloorCorrections")
+        #if DEBUG
         print("📱 Queued floor correction for later sync")
+        #endif
     }
     
     // MARK: - Queue Management for Offline Support
@@ -318,7 +358,9 @@ class SupabaseManager: ObservableObject {
         var queuedMetrics = UserDefaults.standard.array(forKey: "queuedPerformanceMetrics") as? [[String: Any]] ?? []
         queuedMetrics.append(plistData)
         UserDefaults.standard.set(queuedMetrics, forKey: "queuedPerformanceMetrics")
+        #if DEBUG
         print("📱 Queued performance metric for later sync")
+        #endif
     }
     
     private func queueErrorLog(_ data: [String: Any]) {
@@ -327,7 +369,9 @@ class SupabaseManager: ObservableObject {
         var queuedErrors = UserDefaults.standard.array(forKey: "queuedErrorLogs") as? [[String: Any]] ?? []
         queuedErrors.append(plistData)
         UserDefaults.standard.set(queuedErrors, forKey: "queuedErrorLogs")
+        #if DEBUG
         print("📱 Queued error log for later sync")
+        #endif
     }
     
     private func queueUserAction(_ data: [String: Any]) {
@@ -336,7 +380,9 @@ class SupabaseManager: ObservableObject {
         var queuedActions = UserDefaults.standard.array(forKey: "queuedUserActions") as? [[String: Any]] ?? []
         queuedActions.append(plistData)
         UserDefaults.standard.set(queuedActions, forKey: "queuedUserActions")
-        print("📱 Queued user action for later sync")
+        #if DEBUG
+        print("�� Queued user action for later sync")
+        #endif
     }
     
     // Helper function to convert data to property list compatible types
@@ -444,7 +490,9 @@ class SupabaseManager: ObservableObject {
     func testSupabaseConnection(completion: @escaping (Bool) -> Void) {
         // First test: Simple health check
         guard let url = URL(string: baseURL + "/rest/v1/") else {
+            #if DEBUG
             print("❌ Supabase: Invalid test URL")
+            #endif
             completion(false)
             return
         }
@@ -456,7 +504,9 @@ class SupabaseManager: ObservableObject {
         
         let task = URLSession.shared.dataTask(with: request) { data, response, error in
             if let error = error {
+                #if DEBUG
                 print("❌ Supabase: Test connection failed: \(error)")
+                #endif
                 completion(false)
                 return
             }
@@ -464,17 +514,21 @@ class SupabaseManager: ObservableObject {
             if let httpResponse = response as? HTTPURLResponse {
                 let success = (200...299).contains(httpResponse.statusCode)
                 if success {
+                    #if DEBUG
                     print("✅ Supabase: Basic connection successful")
+                    #endif
                     
                     // Now test the specific table
                     self.testUserActionsTable { tableSuccess in
                         completion(tableSuccess)
                     }
                 } else {
+                    #if DEBUG
                     print("❌ Supabase: Basic connection failed - HTTP \(httpResponse.statusCode)")
                     if let data = data, let responseString = String(data: data, encoding: .utf8) {
                         print("❌ Supabase: Test response: \(responseString)")
                     }
+                    #endif
                     completion(false)
                 }
             } else {
@@ -487,7 +541,9 @@ class SupabaseManager: ObservableObject {
     
     private func testUserActionsTable(completion: @escaping (Bool) -> Void) {
         guard let url = URL(string: baseURL + "/rest/v1/user_actions?select=count") else {
+            #if DEBUG
             print("❌ Supabase: Invalid table test URL")
+            #endif
             completion(false)
             return
         }
@@ -499,7 +555,9 @@ class SupabaseManager: ObservableObject {
         
         let task = URLSession.shared.dataTask(with: request) { data, response, error in
             if let error = error {
+                #if DEBUG
                 print("❌ Supabase: Table test failed: \(error)")
+                #endif
                 completion(false)
                 return
             }
@@ -507,13 +565,17 @@ class SupabaseManager: ObservableObject {
             if let httpResponse = response as? HTTPURLResponse {
                 let success = (200...299).contains(httpResponse.statusCode)
                 if success {
+                    #if DEBUG
                     print("✅ Supabase: user_actions table accessible")
+                    #endif
                     completion(true)
                 } else {
+                    #if DEBUG
                     print("❌ Supabase: user_actions table test failed - HTTP \(httpResponse.statusCode)")
                     if let data = data, let responseString = String(data: data, encoding: .utf8) {
                         print("❌ Supabase: Table test response: \(responseString)")
                     }
+                    #endif
                     completion(false)
                 }
             } else {
