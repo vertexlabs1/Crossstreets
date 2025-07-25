@@ -102,6 +102,7 @@ struct ContentView: View {
                         showSettingsSheet: $showSettingsSheet
                     )
                 }
+                .padding(.horizontal, 16)
                 .background(
                     Color(.systemBackground)
                         .cornerRadius(28, corners: [.topLeft, .topRight])
