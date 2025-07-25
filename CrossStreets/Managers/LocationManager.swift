@@ -1390,8 +1390,9 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     func ensureLocationServicesRunning() {
         print("🔄 Ensuring location services are running...")
         
-        // Check if location manager is actually updating
-        if !locationManager.isUpdatingLocation {
+        // Check if location manager is actually updating by checking last update time
+        let timeSinceLastUpdate = Date().timeIntervalSince(lastLocationUpdate)
+        if timeSinceLastUpdate > 30.0 { // If no updates in 30 seconds, restart
             print("⚠️ Location manager not updating - restarting")
             locationManager.startUpdatingLocation()
         }
@@ -1401,6 +1402,41 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
             print("✅ Altimeter available - ensuring it's running")
             startAltimeter()
         }
+    }
+    
+    // MARK: - Helper Methods
+    
+    private func assessGPSDataQuality(location: CLLocation) -> SensorDataQuality {
+        let horizontalAccuracy = location.horizontalAccuracy
+        let verticalAccuracy = location.verticalAccuracy
+        
+        // Check if we have valid altitude data
+        let hasValidAltitude = verticalAccuracy > 0 && verticalAccuracy < 50.0
+        
+        // Assess horizontal accuracy
+        let horizontalQuality: SensorDataQuality
+        if horizontalAccuracy <= 5.0 {
+            horizontalQuality = .excellent
+        } else if horizontalAccuracy <= 15.0 {
+            horizontalQuality = .good
+        } else if horizontalAccuracy <= 50.0 {
+            horizontalQuality = .poor
+        } else {
+            horizontalQuality = .unavailable
+        }
+        
+        // If we have good horizontal accuracy but poor vertical, still consider it usable
+        if hasValidAltitude && horizontalQuality != .unavailable {
+            return verticalAccuracy <= 10.0 ? .excellent : .good
+        }
+        
+        return horizontalQuality
+    }
+    
+    private func checkForParkingDetection() {
+        // This method is called when location updates to check if we should detect parking
+        // For now, we'll leave it empty as parking detection is handled elsewhere
+        // This prevents the compilation error while maintaining the existing logic
     }
     
     // MARK: - CLLocationManagerDelegate

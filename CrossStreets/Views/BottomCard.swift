@@ -16,7 +16,7 @@ struct BottomCard: View {
                 .padding(.bottom, 4)
             
             Group {
-                if let parkedLocation = locationManager.parkedLocation {
+                if locationManager.parkedLocation != nil {
                     ParkedStateView(
                         locationManager: locationManager,
                         showingFloorPicker: $showingFloorPicker,
