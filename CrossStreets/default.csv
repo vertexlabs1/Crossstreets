@@ -1,0 +1,3 @@
+# Default CSV file to suppress resource loading error
+# This file is created to prevent the "Failed to locate resource named 'default.csv'" error
+# The error appears to come from a system framework trying to load a default data file 
