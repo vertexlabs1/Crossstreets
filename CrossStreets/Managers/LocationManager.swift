@@ -623,17 +623,20 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     
     private func performQuickGarageCheck(at location: CLLocation, completion: @escaping (Bool, String?) -> Void) {
         print("🔍 Performing QUICK garage check...")
+        print("📍 Current location: \(location.coordinate.latitude), \(location.coordinate.longitude)")
+        print("📍 GPS Accuracy: \(location.horizontalAccuracy)m (vertical: \(location.verticalAccuracy)m)")
+        print("📍 Altitude: \(location.altitude)m")
         
         // Only search for very close, obvious garages
         let searchRequest = MKLocalSearch.Request()
         searchRequest.naturalLanguageQuery = "parking garage"
         searchRequest.region = MKCoordinateRegion(
             center: location.coordinate,
-            span: MKCoordinateSpan(latitudeDelta: 0.001, longitudeDelta: 0.001) // Very small search area (~100m)
+            span: MKCoordinateSpan(latitudeDelta: 0.002, longitudeDelta: 0.002) // Increased search area (~200m)
         )
         
         let search = MKLocalSearch(request: searchRequest)
-        let searchTimeout = DispatchTime.now() + 1.0 // Very short timeout
+        let searchTimeout = DispatchTime.now() + 1.5 // Increased timeout
         
         search.start { response, error in
             // Check timeout
@@ -651,44 +654,137 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
             
             print("🔍 Found \(response.mapItems.count) potential structures")
             
-            // CONSERVATIVE DETECTION: Only trigger for very obvious cases
+            // ENHANCED DETECTION: More lenient criteria for troubleshooting
             for item in response.mapItems {
                 let distance = location.distance(from: item.placemark.location ?? CLLocation())
                 let name = item.name?.lowercased() ?? ""
                 
-                // VERY CONSERVATIVE CRITERIA:
+                print("🔍 Checking structure: '\(item.name ?? "unnamed")' at \(distance)m")
+                print("   - Name: '\(item.name ?? "unnamed")'")
+                print("   - Distance: \(distance)m")
+                print("   - GPS Accuracy: \(location.horizontalAccuracy)m")
+                
+                // ENHANCED CRITERIA: More lenient for troubleshooting
                 // 1. Must be a clear garage/structure name
                 let isClearGarage = name.contains("garage") || 
                                    name.contains("deck") ||
+                                   name.contains("structure") ||
                                    (name.contains("parking") && (name.contains("structure") || name.contains("center")))
                 
-                // 2. Must be very close (within 50m)
-                let isVeryClose = distance <= 50
+                // SPECIAL CHECK: Richardson Street parking garage
+                let isRichardsonGarage = name.contains("richardson") || 
+                                        (item.name?.contains("Richardson") == true)
+                if isRichardsonGarage {
+                    print("🎯 RICHARDSON GARAGE DETECTED: '\(item.name ?? "unnamed")'")
+                }
                 
-                // 3. Must have excellent GPS accuracy
-                let hasExcellentAccuracy = location.horizontalAccuracy <= 10
+                // 2. More lenient distance (increased from 50m to 100m)
+                let isVeryClose = distance <= 100
+                
+                // 3. More lenient GPS accuracy (increased from 10m to 30m)
+                let hasGoodAccuracy = location.horizontalAccuracy <= 30
                 
                 // 4. Optional: Check for altitude difference (inside multi-level)
-                let hasAltitudeData = location.verticalAccuracy > 0 && location.verticalAccuracy < 15
+                let hasAltitudeData = location.verticalAccuracy > 0 && location.verticalAccuracy < 20
                 let isAtDifferentElevation = hasAltitudeData && abs(location.altitude - (item.placemark.location?.altitude ?? 0)) > 3
                 
-                if isClearGarage && isVeryClose && hasExcellentAccuracy {
+                print("   - Is clear garage: \(isClearGarage)")
+                print("   - Is very close: \(isVeryClose) (max 100m)")
+                print("   - Has good accuracy: \(hasGoodAccuracy) (max 30m)")
+                if hasAltitudeData {
+                    print("   - Altitude data available: \(location.altitude)m vs \(item.placemark.location?.altitude ?? 0)m")
+                    print("   - Elevation difference: \(isAtDifferentElevation)")
+                }
+                
+                // ENHANCED DETECTION: More lenient criteria
+                if isClearGarage && isVeryClose && hasGoodAccuracy {
                     let formattedName = self.formatGarageName(for: item)
-                    print("✅ QUICK CHECK: Very likely in garage '\(formattedName)' at \(distance)m")
+                    print("✅ QUICK CHECK: Likely in garage '\(formattedName)' at \(distance)m")
                     if hasAltitudeData && isAtDifferentElevation {
                         print("   - Elevation difference confirms multi-level garage")
                     }
                     completion(true, formattedName)
                     return
+                } else if isRichardsonGarage {
+                    // SPECIAL CASE: If it's Richardson garage but doesn't meet other criteria, log it
+                    print("⚠️ Richardson garage found but criteria not met:")
+                    print("   - Distance: \(distance)m (max 100m)")
+                    print("   - Accuracy: \(location.horizontalAccuracy)m (max 30m)")
+                    print("   - Is clear garage: \(isClearGarage)")
                 } else {
                     print("❌ Structure '\(item.name ?? "unnamed")' rejected:")
-                    print("   - Distance: \(distance)m (max 50m)")
-                    print("   - Accuracy: \(location.horizontalAccuracy)m (max 10m)")
+                    print("   - Distance: \(distance)m (max 100m)")
+                    print("   - Accuracy: \(location.horizontalAccuracy)m (max 30m)")
                     print("   - Is clear garage: \(isClearGarage)")
                 }
             }
             
-            print("❌ No obvious garage match - parking normally")
+            // FALLBACK: If no garage found, try a specific search for "Richardson"
+            print("🔍 No garage found in initial search, trying Richardson-specific search...")
+            self.performRichardsonSpecificSearch(at: location) { found, name in
+                if found {
+                    print("✅ Richardson-specific search found: \(name ?? "Unknown")")
+                    completion(true, name)
+                } else {
+                    print("❌ No Richardson garage found in specific search")
+                    completion(false, nil)
+                }
+            }
+        }
+    }
+    
+    private func performRichardsonSpecificSearch(at location: CLLocation, completion: @escaping (Bool, String?) -> Void) {
+        print("🔍 Performing Richardson-specific search...")
+        
+        let searchRequest = MKLocalSearch.Request()
+        searchRequest.naturalLanguageQuery = "Richardson"
+        searchRequest.region = MKCoordinateRegion(
+            center: location.coordinate,
+            span: MKCoordinateSpan(latitudeDelta: 0.003, longitudeDelta: 0.003) // Larger search area
+        )
+        
+        let search = MKLocalSearch(request: searchRequest)
+        let searchTimeout = DispatchTime.now() + 1.0
+        
+        search.start { response, error in
+            guard DispatchTime.now() <= searchTimeout else {
+                print("⏱️ Richardson search timed out")
+                completion(false, nil)
+                return
+            }
+            
+            guard let response = response, error == nil else {
+                print("⚠️ Richardson search failed: \(error?.localizedDescription ?? "Unknown error")")
+                completion(false, nil)
+                return
+            }
+            
+            print("🔍 Found \(response.mapItems.count) Richardson-related items")
+            
+            for item in response.mapItems {
+                let distance = location.distance(from: item.placemark.location ?? CLLocation())
+                let name = item.name?.lowercased() ?? ""
+                
+                print("🔍 Richardson item: '\(item.name ?? "unnamed")' at \(distance)m")
+                
+                // Check if it's a parking-related Richardson item
+                let isParkingRelated = name.contains("parking") || 
+                                      name.contains("garage") || 
+                                      name.contains("deck") ||
+                                      name.contains("structure")
+                
+                let isCloseEnough = distance <= 150 // More lenient for Richardson
+                let hasReasonableAccuracy = location.horizontalAccuracy <= 50 // Very lenient
+                
+                if isParkingRelated && isCloseEnough && hasReasonableAccuracy {
+                    let formattedName = self.formatGarageName(for: item)
+                    print("✅ Richardson parking found: '\(formattedName)' at \(distance)m")
+                    completion(true, formattedName)
+                    return
+                }
+            }
+            
+            print("❌ No Richardson parking found")
             completion(false, nil)
         }
     }
