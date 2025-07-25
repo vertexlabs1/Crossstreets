@@ -1460,7 +1460,7 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
         // Limit the number of photos to prevent memory issues
         let maxPhotos = min(photoPaths.count, 10)
         
-        for (index, photoPath) in photoPaths.prefix(maxPhotos).enumerated() {
+        for (_, photoPath) in photoPaths.prefix(maxPhotos).enumerated() {
             let fileURL = photosDirectory.appendingPathComponent(photoPath)
             if let imageData = try? Data(contentsOf: fileURL),
                let image = UIImage(data: imageData) {
