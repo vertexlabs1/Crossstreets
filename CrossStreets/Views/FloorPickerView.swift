@@ -22,13 +22,34 @@ struct FloorPickerView: View {
                 VStack(spacing: 20) {
                     // Header
                     VStack(spacing: 8) {
-                        Image(systemName: "building.2.fill")
-                            .font(.system(size: 40))
-                            .foregroundColor(.blue)
+                        // Parking garage specific icon
+                        ZStack {
+                            // Building background
+                            Image(systemName: "building.2")
+                                .font(.system(size: 36))
+                                .foregroundColor(.blue.opacity(0.3))
+                            
+                            // Car overlay
+                            Image(systemName: "car.fill")
+                                .font(.system(size: 20))
+                                .foregroundColor(.blue)
+                                .offset(y: -2)
+                        }
+                        .padding(.bottom, 4)
+                        
+                        // Garage name for context
+                        Text(garageName)
+                            .font(.headline)
+                            .fontWeight(.semibold)
+                            .foregroundColor(.primary)
+                            .multilineTextAlignment(.center)
+                            .lineLimit(2)
+                            .padding(.horizontal)
                         
                         Text("Select Your Floor")
-                            .font(.title2)
-                            .fontWeight(.semibold)
+                            .font(.title3)
+                            .fontWeight(.medium)
+                            .foregroundColor(.secondary)
                         
                         if let detectedFloor = detectedFloor, garageName != "Custom Location" {
                             Text("We detected you're on **\(detectedFloor)**. Please correct if this is wrong so we can learn!")
