@@ -165,7 +165,7 @@ struct ParkedStateView: View {
                             .foregroundColor(.white)
                             .frame(width: 44, height: 44)
                             .background(Color.red)
-                            .clipShape(Circle())
+                            .cornerRadius(10)
                     }
                     .buttonStyle(PlainButtonStyle())
                 }

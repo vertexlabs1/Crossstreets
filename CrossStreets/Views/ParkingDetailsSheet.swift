@@ -8,7 +8,10 @@ struct ParkingDetailsSheet: View {
     @State private var notes: String = ""
     @State private var selectedPhotos: [PhotosPickerItem] = []
     @State private var parkingPhotos: [UIImage] = []
-    @FocusState private var isNotesFieldFocused: Bool
+    @State private var isNotesFieldFocused: Bool = false
+    @State private var showingImagePicker = false
+    @State private var showingShareSheet = false
+    @State private var shareText = ""
     
     var body: some View {
         NavigationView {
@@ -62,15 +65,19 @@ struct ParkingDetailsSheet: View {
                             Text("Photos")
                                 .font(.headline)
                             Spacer()
-                            PhotosPicker(selection: $selectedPhotos, matching: .images) {
-                                Image(systemName: "plus.circle.fill")
-                                    .font(.title2)
-                                    .foregroundColor(.blue)
+                            Button("Capture Photo") {
+                                showingImagePicker = true
                             }
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundColor(.blue)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background(Color.blue.opacity(0.1))
+                            .cornerRadius(8)
                         }
                         
                         if parkingPhotos.isEmpty {
-                            Text("Tap the + button to add photos of your parking spot")
+                            Text("Tap 'Capture Photo' to take a photo of your parking spot")
                                 .font(.subheadline)
                                 .foregroundColor(.secondary)
                                 .padding()
@@ -141,7 +148,8 @@ struct ParkingDetailsSheet: View {
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Share") {
-                        shareParkingLocation()
+                        prepareShareContent()
+                        showingShareSheet = true
                     }
                 }
                 ToolbarItemGroup(placement: .keyboard) {
@@ -162,15 +170,18 @@ struct ParkingDetailsSheet: View {
                 }
             }
         }
-        .onChange(of: selectedPhotos) { _, newPhotos in
-            Task {
-                for photo in newPhotos {
-                    if let data = try? await photo.loadTransferable(type: Data.self),
-                       let image = UIImage(data: data) {
+        .sheet(isPresented: $showingImagePicker) {
+            ImagePicker(selectedImage: Binding(
+                get: { nil },
+                set: { image in
+                    if let image = image {
                         parkingPhotos.append(image)
                     }
                 }
-            }
+            ))
+        }
+        .sheet(isPresented: $showingShareSheet) {
+            ShareSheet(activityItems: [shareText])
         }
     }
     
@@ -179,32 +190,68 @@ struct ParkingDetailsSheet: View {
         locationManager.updateParkingPhotos(parkingPhotos)
     }
     
-    private func shareParkingLocation() {
+    private func prepareShareContent() {
         let locationText: String
         if let garageName = parking.garageName {
-            locationText = "Parked at \(garageName)"
+            locationText = "Hey, I'm parked at \(garageName)"
         } else {
-            locationText = "Parked at \(parking.address)"
+            locationText = "Hey, I'm parked at \(parking.address)"
         }
         
-        let shareText = """
-        \(locationText)
-        Floor: \(parking.floor ?? "Unknown")
-        Time: \(parking.timestamp.formatted())
+        let floorInfo = parking.floor != nil ? "\nFloor: \(parking.floor!)" : ""
+        let timeInfo = "\nTime: \(parking.timestamp.formatted())"
+        let directionsLink = "\n\nGet directions: maps://?q=\(parking.coordinate.latitude),\(parking.coordinate.longitude)"
         
-        Get directions: maps://?q=\(parking.coordinate.latitude),\(parking.coordinate.longitude)
-        """
+        shareText = locationText + floorInfo + timeInfo + directionsLink
+    }
+}
+
+struct ImagePicker: UIViewControllerRepresentable {
+    @Binding var selectedImage: UIImage?
+    @Environment(\.dismiss) private var dismiss
+    
+    func makeUIViewController(context: Context) -> UIImagePickerController {
+        let picker = UIImagePickerController()
+        picker.delegate = context.coordinator
+        picker.sourceType = .camera
+        return picker
+    }
+    
+    func updateUIViewController(_ uiViewController: UIImagePickerController, context: Context) {}
+    
+    func makeCoordinator() -> Coordinator {
+        Coordinator(self)
+    }
+    
+    class Coordinator: NSObject, UIImagePickerControllerDelegate, UINavigationControllerDelegate {
+        let parent: ImagePicker
         
-        let activityVC = UIActivityViewController(
-            activityItems: [shareText],
-            applicationActivities: nil
-        )
+        init(_ parent: ImagePicker) {
+            self.parent = parent
+        }
         
-        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
-           let window = windowScene.windows.first {
-            window.rootViewController?.present(activityVC, animated: true)
+        func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey : Any]) {
+            if let image = info[.originalImage] as? UIImage {
+                parent.selectedImage = image
+            }
+            parent.dismiss()
+        }
+        
+        func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
+            parent.dismiss()
         }
     }
+}
+
+struct ShareSheet: UIViewControllerRepresentable {
+    let activityItems: [Any]
+    
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        let controller = UIActivityViewController(activityItems: activityItems, applicationActivities: nil)
+        return controller
+    }
+    
+    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
 }
 
 struct DetailRow: View {
@@ -222,4 +269,5 @@ struct DetailRow: View {
                 .multilineTextAlignment(.trailing)
         }
     }
+} 
 } 
