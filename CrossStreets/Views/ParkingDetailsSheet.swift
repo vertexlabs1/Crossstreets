@@ -11,6 +11,7 @@ struct ParkingDetailsSheet: View {
     @State private var showingImagePicker = false
     @State private var showingShareSheet = false
     @State private var shareText = ""
+    @FocusState private var isNotesFieldFocused: Bool
     
     var body: some View {
         NavigationView {
@@ -52,6 +53,7 @@ struct ParkingDetailsSheet: View {
                         TextField("Add a note about your parking spot...", text: $notes, axis: .vertical)
                             .textFieldStyle(.roundedBorder)
                             .lineLimit(3...6)
+                            .focused($isNotesFieldFocused)
                     }
                     .padding(.horizontal)
                     
@@ -150,6 +152,12 @@ struct ParkingDetailsSheet: View {
                         showingShareSheet = true
                     }
                 }
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button("Done") {
+                        isNotesFieldFocused = false
+                    }
+                }
             }
         }
         .onAppear {
@@ -185,16 +193,18 @@ struct ParkingDetailsSheet: View {
     private func prepareShareContent() {
         let locationText: String
         if let garageName = parking.garageName {
-            locationText = "Hey, I'm parked at \(garageName)"
+            if let floor = parking.floor {
+                locationText = "Hey, I'm parked at \(garageName) on floor \(floor)"
+            } else {
+                locationText = "Hey, I'm parked at \(garageName)"
+            }
         } else {
             locationText = "Hey, I'm parked at \(parking.address)"
         }
         
-        let floorInfo = parking.floor != nil ? "\nFloor: \(parking.floor!)" : ""
-        let timeInfo = "\nTime: \(parking.timestamp.formatted())"
         let directionsLink = "\n\nGet directions: maps://?q=\(parking.coordinate.latitude),\(parking.coordinate.longitude)"
         
-        shareText = locationText + floorInfo + timeInfo + directionsLink
+        shareText = locationText + directionsLink
     }
 }
 

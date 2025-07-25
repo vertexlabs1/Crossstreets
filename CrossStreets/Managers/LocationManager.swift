@@ -444,113 +444,6 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
         }
     }
     
-    func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
-        guard let location = locations.last else { return }
-        DispatchQueue.main.async { [weak self] in
-            guard let self = self else { return }
-            
-            // Throttle location updates to prevent excessive view rebuilds
-            let now = Date()
-            guard now.timeIntervalSince(self.lastLocationUpdate) >= 2.0 else { return }
-            
-            // Track GPS altitude and accuracy
-            self.gpsAltitude = location.altitude
-            self.gpsVerticalAccuracy = location.verticalAccuracy
-            
-            // Log GPS data quality
-            let gpsQuality = self.assessGPSDataQuality(location: location)
-            if gpsQuality != self.sensorDataQuality {
-                print("📡 GPS: \(location.altitude)m ±\(location.verticalAccuracy)m (quality: \(gpsQuality.description))")
-            }
-            
-            // Only update if location is significantly different
-            if let currentLocation = self.currentLocation {
-                let distance = location.distance(from: currentLocation)
-                if distance < 5.0 { // Only update if moved more than 5 meters
-                    return
-                }
-            }
-            
-            self.currentLocation = location
-            self.lastLocationUpdate = now
-            self.optimizeLocationAccuracy()
-        }
-    }
-    
-    private func assessGPSDataQuality(location: CLLocation) -> SensorDataQuality {
-        let horizontalAccuracy = location.horizontalAccuracy
-        let verticalAccuracy = location.verticalAccuracy
-        
-        // Check if we have valid altitude data
-        let hasValidAltitude = verticalAccuracy > 0 && verticalAccuracy < 50.0
-        
-        // Assess horizontal accuracy
-        let horizontalQuality: SensorDataQuality
-        if horizontalAccuracy <= 5.0 {
-            horizontalQuality = .excellent
-        } else if horizontalAccuracy <= 15.0 {
-            horizontalQuality = .good
-        } else if horizontalAccuracy <= 50.0 {
-            horizontalQuality = .poor
-        } else {
-            horizontalQuality = .unavailable
-        }
-        
-        // If we have good horizontal accuracy but poor vertical, still consider it usable
-        if hasValidAltitude && horizontalQuality != .unavailable {
-            return verticalAccuracy <= 10.0 ? .excellent : .good
-        }
-        
-        return horizontalQuality
-    }
-    
-    func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
-        print("Location manager failed with error: \(error.localizedDescription)")
-        
-        DispatchQueue.main.async {
-            if let clError = error as? CLError {
-                switch clError.code {
-                case .denied:
-                    self.isLocationEnabled = false
-                    self.showLocationPermissionAlert()
-                    self.locationPermissionError = "Location permission denied. Please enable location access in Settings."
-                case .locationUnknown:
-                    // Temporary error, will retry
-                    break
-                case .network:
-                    // Network error, will retry
-                    break
-                default:
-                    self.isLocationEnabled = false
-                }
-            } else {
-                self.isLocationEnabled = false
-            }
-        }
-    }
-    
-    func locationManager(_ manager: CLLocationManager, didChangeAuthorization status: CLAuthorizationStatus) {
-        DispatchQueue.main.async {
-            self.authorizationStatus = status
-            
-            switch status {
-            case .authorizedWhenInUse, .authorizedAlways:
-                self.isLocationEnabled = true
-                self.locationManager.startUpdatingLocation()
-                self.cleanupOldData() // Clean up old data when location is enabled
-                self.locationPermissionError = nil
-            case .denied, .restricted:
-                self.isLocationEnabled = false
-                self.showLocationPermissionAlert()
-                self.locationPermissionError = "Location permission denied. Please enable location access in Settings."
-            case .notDetermined:
-                self.isLocationEnabled = false
-            @unknown default:
-                self.isLocationEnabled = false
-            }
-        }
-    }
-    
     func detectParkingType(completion: @escaping () -> Void = {}) {
         guard !isDetectingParking else { return }
         
@@ -1476,39 +1369,122 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     func refreshLocationPermissions() {
         print("🔄 Refreshing location permissions...")
         
-        // Check current authorization status
         let status = locationManager.authorizationStatus
         print("📍 Current authorization status: \(status.rawValue)")
         
-        // If we have authorization, restart location services
-        if status == .authorizedWhenInUse || status == .authorizedAlways {
+        switch status {
+        case .authorizedWhenInUse, .authorizedAlways:
             print("✅ Location authorized - restarting services")
-            locationManager.startUpdatingLocation()
-        } else if status == .denied || status == .restricted {
+            ensureLocationServicesRunning()
+        case .denied, .restricted:
             print("❌ Location access denied or restricted")
-            // Don't show alert here - let the user handle it in settings
-        } else if status == .notDetermined {
-            print("❓ Location permission not determined - requesting access")
+            // Don't show alert here - let the UI handle it
+        case .notDetermined:
+            print("❓ Location permission not determined - requesting")
             locationManager.requestWhenInUseAuthorization()
+        @unknown default:
+            print("❓ Unknown authorization status: \(status)")
         }
     }
     
     func ensureLocationServicesRunning() {
         print("🔄 Ensuring location services are running...")
         
-        // Check if location manager is running by checking if we have recent location updates
-        let timeSinceLastUpdate = Date().timeIntervalSince(lastLocationUpdate)
-        if timeSinceLastUpdate > 30.0 { // If no updates in 30 seconds, restart
+        // Check if location manager is actually updating
+        if !locationManager.isUpdatingLocation {
             print("⚠️ Location manager not updating - restarting")
             locationManager.startUpdatingLocation()
-        } else {
-            print("✅ Location services are running")
         }
         
-        // Check if altimeter is running (if available)
+        // Ensure altimeter is running
         if CMAltimeter.isRelativeAltitudeAvailable() {
             print("✅ Altimeter available - ensuring it's running")
             startAltimeter()
+        }
+    }
+    
+    // MARK: - CLLocationManagerDelegate
+    
+    func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
+        guard let location = locations.last else { return }
+        
+        // Record GPS altitude and accuracy
+        gpsAltitude = location.altitude
+        gpsVerticalAccuracy = location.verticalAccuracy
+        
+        // Assess GPS data quality
+        if location.verticalAccuracy > 0 && location.verticalAccuracy < 20 {
+            sensorDataQuality = .excellent
+        } else if location.verticalAccuracy >= 20 && location.verticalAccuracy < 50 {
+            sensorDataQuality = .good
+        } else {
+            sensorDataQuality = .poor
+        }
+        
+        // Only update if we have a significant improvement or first location
+        if currentLocation == nil || 
+           location.horizontalAccuracy < currentLocation!.horizontalAccuracy ||
+           abs(location.timestamp.timeIntervalSince(currentLocation!.timestamp)) > 30.0 {
+            
+            currentLocation = location
+            lastLocationUpdate = Date()
+            
+            // Only log first location to reduce noise
+            if currentLocation == location {
+                print("📍 currentLocation: First location set")
+            }
+        }
+        
+        // Check for parking detection
+        checkForParkingDetection()
+    }
+    
+    func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
+        print("❌ Location manager failed with error: \(error.localizedDescription)")
+        
+        // Handle specific error types
+        if let clError = error as? CLError {
+            switch clError.code {
+            case .denied:
+                print("📍 Location access denied by user")
+                // Don't show alert here - let the UI handle it
+            case .locationUnknown:
+                print("📍 Location temporarily unavailable")
+                // This is temporary, don't restart services
+            case .network:
+                print("📍 Network error - location unavailable")
+                // This is temporary, don't restart services
+            default:
+                print("📍 Other location error: \(clError.localizedDescription)")
+                // For other errors, try to restart after a delay
+                DispatchQueue.main.asyncAfter(deadline: .now() + 5.0) {
+                    if self.locationManager.authorizationStatus == .authorizedWhenInUse ||
+                       self.locationManager.authorizationStatus == .authorizedAlways {
+                        print("🔄 Retrying location services after error")
+                        self.locationManager.startUpdatingLocation()
+                    }
+                }
+            }
+        }
+    }
+    
+    func locationManager(_ manager: CLLocationManager, didChangeAuthorization status: CLAuthorizationStatus) {
+        print("📍 Location authorization changed to: \(status.rawValue)")
+        
+        switch status {
+        case .authorizedWhenInUse, .authorizedAlways:
+            print("✅ Location authorized - starting services")
+            locationManager.startUpdatingLocation()
+            if CMAltimeter.isRelativeAltitudeAvailable() {
+                startAltimeter()
+            }
+        case .denied, .restricted:
+            print("❌ Location access denied or restricted")
+            // Don't show alert here - let the UI handle it
+        case .notDetermined:
+            print("❓ Location permission not determined")
+        @unknown default:
+            print("❓ Unknown authorization status: \(status)")
         }
     }
 }

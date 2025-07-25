@@ -2,49 +2,39 @@ import SwiftUI
 
 struct BottomCard: View {
     @ObservedObject var locationManager: LocationManager
-    @Binding var showingFloorPicker: Bool
-    @Binding var detectedGarageName: String?
     @State private var showingParkingDetails = false
     
     var body: some View {
         VStack(spacing: 0) {
             // Native drag indicator
-            VStack(spacing: 4) {
-                RoundedRectangle(cornerRadius: 2.5)
-                    .fill(Color.gray.opacity(0.15))
-                    .frame(width: 32, height: 4)
-                RoundedRectangle(cornerRadius: 2.5)
-                    .fill(Color.gray.opacity(0.08))
-                    .frame(width: 20, height: 2)
-            }
-            .padding(.top, 4)
-            .padding(.bottom, 10)
-            .padding(.horizontal, 20)
+            RoundedRectangle(cornerRadius: 2.5)
+                .fill(Color.gray.opacity(0.3))
+                .frame(width: 36, height: 5)
+                .padding(.top, 8)
+                .padding(.bottom, 4)
             
             Group {
-                if locationManager.parkedLocation != nil {
-                    ParkedStateView(
-                        locationManager: locationManager,
-                        showingFloorPicker: $showingFloorPicker,
-                        detectedGarageName: $detectedGarageName
-                    )
+                if let parkedLocation = locationManager.parkedLocation {
+                    ParkedStateView(locationManager: locationManager, parking: parkedLocation)
                 } else {
-                    NotParkedStateView(
-                        locationManager: locationManager,
-                        detectedGarageName: $detectedGarageName,
-                        showingFloorPicker: $showingFloorPicker
-                    )
+                    NotParkedStateView(locationManager: locationManager)
                 }
             }
         }
-        .contentShape(Rectangle())
+        .background(Color(.systemBackground))
+        .cornerRadius(20, corners: [.topLeft, .topRight])
+        .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: -5)
+        .contentShape(Rectangle()) // Make entire area tappable
         .gesture(
-            DragGesture(minimumDistance: 20)
+            DragGesture(minimumDistance: 20) // Require minimum distance to start
                 .onEnded { value in
+                    // Validate translation values to prevent NaN
+                    let translationHeight = value.translation.height.isFinite ? value.translation.height : 0
                     let velocity = value.predictedEndTranslation.height - value.translation.height
+                    let velocityHeight = velocity.isFinite ? velocity : 0
                     
                     // Open if swiped up with sufficient distance or velocity
-                    if value.translation.height < -40 || velocity < -150 {
+                    if translationHeight < -40 || velocityHeight < -150 {
                         showingParkingDetails = true
                     }
                 }

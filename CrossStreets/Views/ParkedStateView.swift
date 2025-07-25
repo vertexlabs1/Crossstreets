@@ -3,24 +3,25 @@ import SwiftUI
 // Separate view component that manages its own timer
 struct TimeAgoView: View {
     let timestamp: Date
-    @State private var timeAgoString: String = ""
+    @State private var timeAgo: String = ""
     @State private var timer: Timer?
     
     var body: some View {
-        Text(timeAgoString)
-            .font(.system(size: 13))
+        Text(timeAgo)
+            .font(.subheadline)
             .foregroundColor(.secondary)
             .onAppear {
                 updateTimeAgo()
                 startTimer()
             }
             .onDisappear {
-                stopTimer()
+                timer?.invalidate()
+                timer = nil
             }
     }
     
     private func updateTimeAgo() {
-        timeAgoString = DateHelper.timeAgo(from: timestamp)
+        timeAgo = DateHelper.timeAgo(from: timestamp)
     }
     
     private func startTimer() {
@@ -28,11 +29,6 @@ struct TimeAgoView: View {
         timer = Timer.scheduledTimer(withTimeInterval: 30.0, repeats: true) { _ in
             updateTimeAgo()
         }
-    }
-    
-    private func stopTimer() {
-        timer?.invalidate()
-        timer = nil
     }
 }
 
