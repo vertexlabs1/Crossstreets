@@ -478,15 +478,17 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
             return
         }
         
-        // QUICK PROXIMITY CHECK: Only search if we have good accuracy
-        guard currentLocation.horizontalAccuracy <= 20 else {
-            print("📍 Poor GPS accuracy (\(currentLocation.horizontalAccuracy)m) - parking normally")
+        // QUICK PROXIMITY CHECK: Only search if we have reasonable accuracy
+        guard currentLocation.horizontalAccuracy <= 50 else {
+            print("📍 Very poor GPS accuracy (\(currentLocation.horizontalAccuracy)m) - parking normally")
             isDetectingParking = false
             self.saveParkedLocation(floor: nil)
             self.detectedGarageInfo = GarageDetectionResult(isInGarage: false, garageName: nil)
             completion()
             return
         }
+        
+        print("📍 GPS accuracy acceptable (\(currentLocation.horizontalAccuracy)m) - proceeding with garage detection")
         
         // FAST GARAGE CHECK: Only look for very close, obvious garages
         performQuickGarageCheck(at: currentLocation) { [weak self] isInGarage, garageName in
