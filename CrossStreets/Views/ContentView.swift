@@ -106,7 +106,6 @@ struct ContentView: View {
                     Color(.systemBackground)
                         .cornerRadius(28, corners: [.topLeft, .topRight])
                         .shadow(color: .black.opacity(0.1), radius: 25, y: -10)
-                        .edgesIgnoringSafeArea(.bottom)
                 )
             }
             
