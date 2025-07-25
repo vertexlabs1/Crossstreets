@@ -1394,4 +1394,83 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
         print("🔍 DEBUG: Location Manager Status")
         #endif
     }
+    
+    // MARK: - Parking Notes Management
+    
+    func updateParkingNotes(_ notes: String) {
+        guard var currentParking = parkedLocation else { return }
+        currentParking.notes = notes.isEmpty ? nil : notes
+        parkedLocation = currentParking
+        
+        // Save to UserDefaults
+        if let parkingData = try? JSONEncoder().encode(currentParking) {
+            UserDefaults.standard.set(parkingData, forKey: "parkedLocation")
+        }
+        
+        print("📝 Updated parking notes: \(notes)")
+    }
+    
+    func updateParkingPhotos(_ photos: [UIImage]) {
+        guard var currentParking = parkedLocation else { return }
+        
+        // Create photos directory if it doesn't exist
+        let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        let photosDirectory = documentsPath.appendingPathComponent("ParkingPhotos")
+        
+        do {
+            try FileManager.default.createDirectory(at: photosDirectory, withIntermediateDirectories: true)
+        } catch {
+            print("❌ Failed to create photos directory: \(error)")
+            return
+        }
+        
+        var photoPaths: [String] = []
+        
+        // Save each photo to file system
+        for (index, photo) in photos.enumerated() {
+            let fileName = "\(currentParking.id.uuidString)_\(index).jpg"
+            let fileURL = photosDirectory.appendingPathComponent(fileName)
+            
+            if let imageData = photo.jpegData(compressionQuality: 0.8) {
+                do {
+                    try imageData.write(to: fileURL)
+                    photoPaths.append(fileName)
+                    print("📸 Saved photo: \(fileName)")
+                } catch {
+                    print("❌ Failed to save photo: \(error)")
+                }
+            }
+        }
+        
+        // Update parking location with photo paths
+        currentParking.photoPaths = photoPaths.isEmpty ? nil : photoPaths
+        parkedLocation = currentParking
+        
+        // Save to UserDefaults
+        if let parkingData = try? JSONEncoder().encode(currentParking) {
+            UserDefaults.standard.set(parkingData, forKey: "parkedLocation")
+        }
+        
+        print("📸 Updated parking photos: \(photoPaths.count) photos")
+    }
+    
+    func loadParkingPhotos() -> [UIImage] {
+        guard let currentParking = parkedLocation,
+              let photoPaths = currentParking.photoPaths else { return [] }
+        
+        let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        let photosDirectory = documentsPath.appendingPathComponent("ParkingPhotos")
+        
+        var photos: [UIImage] = []
+        
+        for photoPath in photoPaths {
+            let fileURL = photosDirectory.appendingPathComponent(photoPath)
+            if let imageData = try? Data(contentsOf: fileURL),
+               let image = UIImage(data: imageData) {
+                photos.append(image)
+            }
+        }
+        
+        return photos
+    }
 }

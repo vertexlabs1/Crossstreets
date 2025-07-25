@@ -19,6 +19,7 @@ struct ParkingLocation: Codable, Identifiable, Equatable {
     let timestamp: Date
     let garageName: String?
     var notes: String?
+    var photoPaths: [String]? // Store file paths to photos
     
     static func == (lhs: ParkingLocation, rhs: ParkingLocation) -> Bool {
         lhs.id == rhs.id
