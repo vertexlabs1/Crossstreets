@@ -13,6 +13,9 @@ class SupabaseManager: ObservableObject {
         guard let key = Bundle.main.infoDictionary?["SupabaseAPIKey"] as? String else {
             fatalError("SupabaseAPIKey not found in Info.plist. Please add it securely.")
         }
+        #if DEBUG
+        print("🔑 Supabase API key loaded: \(key.prefix(20))...")
+        #endif
         return key
     }()
     

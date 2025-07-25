@@ -7,6 +7,10 @@ struct ParkedStateView: View {
     @State private var displayAddress: String = ""
     @State private var showingNotesEditor: Bool = false
     
+    // Timer for timeAgo display - updates every 30 seconds instead of every second
+    @State private var timeAgoString: String = ""
+    @State private var timeAgoTimer: Timer?
+    
     var body: some View {
         guard let parkedLocation = locationManager.parkedLocation else {
             return AnyView(EmptyView())
@@ -76,17 +80,12 @@ struct ParkedStateView: View {
                                     }
                                 }) {
                                     Image(systemName: "pencil.circle.fill")
-                                        .font(.system(size: 16))
+                                        .font(.system(size: 14))
                                         .foregroundColor(.blue)
                                 }
+                                .buttonStyle(PlainButtonStyle())
                             }
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 4)
-                            .background(Color.blue.opacity(0.1))
-                            .cornerRadius(6)
                         }
-                        
-                        Spacer()
                         
                         VStack(alignment: .trailing, spacing: 2) {
                             HStack {
@@ -111,7 +110,7 @@ struct ParkedStateView: View {
                                 .buttonStyle(PlainButtonStyle())
                             }
                             
-                            Text(DateHelper.timeAgo(from: parkedLocation.timestamp))
+                            Text(timeAgoString)
                                 .font(.system(size: 13))
                                 .foregroundColor(.secondary)
                             
@@ -170,7 +169,13 @@ struct ParkedStateView: View {
             }
             .padding(.horizontal, 20)
             .padding(.bottom, 10)
-            // Removed onReceive to prevent continuous view rebuilding
+            .onAppear {
+                updateTimeAgo()
+                startTimeAgoTimer()
+            }
+            .onDisappear {
+                stopTimeAgoTimer()
+            }
             .sheet(isPresented: $showingNotesEditor) {
                 NotesEditorView(
                     showingNotesEditor: $showingNotesEditor,
@@ -180,6 +185,23 @@ struct ParkedStateView: View {
                 )
             }
         )
+    }
+    
+    private func updateTimeAgo() {
+        guard let parkedLocation = locationManager.parkedLocation else { return }
+        timeAgoString = DateHelper.timeAgo(from: parkedLocation.timestamp)
+    }
+    
+    private func startTimeAgoTimer() {
+        // Update every 30 seconds instead of every second
+        timeAgoTimer = Timer.scheduledTimer(withTimeInterval: 30.0, repeats: true) { _ in
+            updateTimeAgo()
+        }
+    }
+    
+    private func stopTimeAgoTimer() {
+        timeAgoTimer?.invalidate()
+        timeAgoTimer = nil
     }
 }
 
