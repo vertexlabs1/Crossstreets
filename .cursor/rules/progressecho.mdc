@@ -1,0 +1,20 @@
+---
+# A brief human‐readable description of what this rule does
+description: "Echo a one‐line progress update after every step"
+
+# Which files or workflows to apply this to (you can adjust the glob as needed)
+globs:
+  - "**"        # every project
+alwaysApply: true
+
+# Fire on the “step finished” event
+when: onStepEnd
+
+# No extra filtering; always run the action
+filter: always
+
+# The action to perform: run a shell echo that prints your progress placeholders
+action:
+  - run: |
+      echo "[Progress] Step ${CURSOR_STEP_INDEX}/${CURSOR_TOTAL_STEPS}: ${CURSOR_LAST_ACTION}"
+---

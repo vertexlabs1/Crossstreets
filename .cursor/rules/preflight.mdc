@@ -1,0 +1,30 @@
+---
+description: "Create a git snapshot before any write/delete step"
+globs:
+  - "**"           # apply in every project
+alwaysApply: true  # no manual opt‑in needed
+
+# fire right before each step runs
+when: onStepStart
+
+# only trigger on steps that could change your code or infra
+filter:
+  contains:
+    - "apply"
+    - "migrate"
+    - "deploy"
+    - "create"
+    - "delete"
+    - "update"
+    # you can add more keywords here that denote destructive ops
+
+action:
+  # 1. stash any uncommitted work so we don't override it
+  - run: git stash push -u -m "cursor preflight: stash untracked/modified"
+  # 2. create a timestamped branch off your current HEAD
+  - run: |
+      TS=$(date +%Y%m%d_%H%M%S)
+      git checkout -b cursor-backup-$TS
+  # 3. commit current HEAD so you have a full snapshot
+  - run: git commit --allow-empty -m "cursor preflight backup at $TS"
+---
