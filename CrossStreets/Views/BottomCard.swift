@@ -29,7 +29,7 @@ struct BottomCard: View {
                     .onChanged { value in
                         isDragging = true
                         // Only allow upward drag
-                        let newOffset = min(0, -value.translation.y)
+                        let newOffset = min(0, -value.translation.height)
                         dragOffset = max(-maxDragOffset, newOffset)
                         
                         // Add haptic feedback when crossing threshold
