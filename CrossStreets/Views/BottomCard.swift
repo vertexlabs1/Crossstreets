@@ -5,6 +5,11 @@ struct BottomCard: View {
     @Binding var showingFloorPicker: Bool
     @Binding var detectedGarageName: String?
     @State private var showingParkingDetails = false
+    @State private var dragOffset: CGFloat = 0
+    @State private var isDragging = false
+    
+    private let swipeThreshold: CGFloat = 50
+    private let maxDragOffset: CGFloat = 100
     
     var body: some View {
         VStack(spacing: 0) {
@@ -37,23 +42,58 @@ struct BottomCard: View {
                 }
             }
         }
-        .contentShape(Rectangle())
-        .onTapGesture {
-            print("🎯 BottomCard tapped - opening parking details")
-            HapticManager.lightImpact()
-            showingParkingDetails = true
-        }
+        .offset(y: dragOffset)
         .gesture(
-            DragGesture(minimumDistance: 20)
+            DragGesture(minimumDistance: 5)
+                .onChanged { value in
+                    isDragging = true
+                    
+                    // Only allow upward drag with resistance
+                    let translation = value.translation.height
+                    let resistance: CGFloat = 0.6
+                    
+                    if translation < 0 {
+                        // Upward drag - apply resistance
+                        dragOffset = translation * resistance
+                    } else {
+                        // Downward drag - allow with less resistance
+                        dragOffset = translation * 0.3
+                    }
+                    
+                    // Limit the drag range
+                    dragOffset = max(-maxDragOffset, min(maxDragOffset, dragOffset))
+                    
+                    // Haptic feedback when crossing threshold
+                    if abs(dragOffset) > swipeThreshold && !showingParkingDetails {
+                        HapticManager.lightImpact()
+                    }
+                }
                 .onEnded { value in
-                    // Check if it's an upward swipe
-                    if value.translation.height < -30 && abs(value.translation.width) < 50 {
-                        print("🎯 BottomCard swiped up - opening parking details")
+                    isDragging = false
+                    let velocity = value.predictedEndTranslation.height - value.translation.height
+                    
+                    // Check if swipe threshold was met or if there's sufficient velocity
+                    let shouldOpen = abs(dragOffset) > swipeThreshold || 
+                                   (value.translation.height < -30 && velocity < -100)
+                    
+                    if shouldOpen {
+                        withAnimation(.spring(response: 0.4, dampingFraction: 0.8, blendDuration: 0)) {
+                            showingParkingDetails = true
+                            dragOffset = 0
+                        }
                         HapticManager.mediumImpact()
-                        showingParkingDetails = true
+                    } else {
+                        // Reset position with spring animation
+                        withAnimation(.spring(response: 0.4, dampingFraction: 0.8, blendDuration: 0)) {
+                            dragOffset = 0
+                        }
                     }
                 }
         )
+        .onTapGesture {
+            HapticManager.lightImpact()
+            showingParkingDetails = true
+        }
         .sheet(isPresented: $showingParkingDetails) {
             if let parking = locationManager.parkedLocation {
                 ParkingDetailsSheet(locationManager: locationManager, parking: parking)

@@ -8,21 +8,47 @@ struct ParkingDetailsSheet: View {
     @State private var notes: String = ""
     @State private var selectedPhotos: [PhotosPickerItem] = []
     @State private var parkingPhotos: [UIImage] = []
+    @State private var dragOffset: CGFloat = 0
     
     var body: some View {
         NavigationView {
             VStack(spacing: 0) {
-                // Drag indicator at the top
+                // Native drag indicator
                 VStack(spacing: 4) {
                     RoundedRectangle(cornerRadius: 2.5)
                         .fill(Color.gray.opacity(0.3))
-                        .frame(width: 32, height: 4)
+                        .frame(width: 36, height: 5)
                     RoundedRectangle(cornerRadius: 2.5)
-                        .fill(Color.gray.opacity(0.15))
-                        .frame(width: 20, height: 2)
+                        .fill(Color.gray.opacity(0.2))
+                        .frame(width: 24, height: 3)
                 }
                 .padding(.top, 8)
-                .padding(.bottom, 16)
+                .padding(.bottom, 20)
+                .offset(y: dragOffset)
+                .gesture(
+                    DragGesture(minimumDistance: 5)
+                        .onChanged { value in
+                            // Only allow downward drag for dismiss
+                            if value.translation.height > 0 {
+                                dragOffset = value.translation.height * 0.5
+                            }
+                        }
+                        .onEnded { value in
+                            let velocity = value.predictedEndTranslation.height - value.translation.height
+                            
+                            // Dismiss if dragged down far enough or with sufficient velocity
+                            if value.translation.height > 100 || velocity > 500 {
+                                withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                                    dismiss()
+                                }
+                            } else {
+                                // Reset position
+                                withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                                    dragOffset = 0
+                                }
+                            }
+                        }
+                )
                 
                 ScrollView {
                     VStack(alignment: .leading, spacing: 20) {
