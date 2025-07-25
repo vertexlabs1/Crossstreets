@@ -17,28 +17,35 @@ struct CurrentParkingView: View {
                             .font(.system(size: 13, weight: .medium))
                             .foregroundColor(.blue)
                         
-                        Text(displayAddress.isEmpty ? "Locating..." : displayAddress)
-                            .font(.system(size: 16, weight: .medium))
-                            .foregroundColor(.primary)
-                            .lineLimit(2)
-                            .onAppear {
-                                displayAddress = parking.address
-                            }
-                            // Removed onChange to prevent continuous view rebuilding
-                        
                         if let garageName = parking.garageName {
-                            HStack(spacing: 4) {
-                                Image(systemName: "building.fill")
-                                    .font(.system(size: 11))
-                                Text(garageName)
-                                    .font(.system(size: 14))
-                                    .lineLimit(1)
-                                if let floor = parking.floor {
-                                    Text("• \(floor)")
-                                        .font(.system(size: 14, weight: .medium))
+                            // Garage parking - show garage name as main text
+                            Text(garageName)
+                                .font(.system(size: 16, weight: .medium))
+                                .foregroundColor(.primary)
+                                .lineLimit(2)
+                                .onAppear {
+                                    displayAddress = parking.address
+                                }
+                            
+                            // Show floor information below
+                            if let floor = parking.floor {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "building.fill")
+                                        .font(.system(size: 11))
+                                    Text("Floor \(floor)")
+                                        .font(.system(size: 14))
+                                        .foregroundColor(.secondary)
                                 }
                             }
-                            .foregroundColor(.secondary)
+                        } else {
+                            // Street parking - show address as main text
+                            Text(displayAddress.isEmpty ? "Locating..." : displayAddress)
+                                .font(.system(size: 16, weight: .medium))
+                                .foregroundColor(.primary)
+                                .lineLimit(2)
+                                .onAppear {
+                                    displayAddress = parking.address
+                                }
                         }
                         
                         HStack(spacing: 8) {
@@ -75,3 +82,4 @@ struct CurrentParkingView: View {
 #Preview {
     CurrentParkingView(locationManager: LocationManager())
 }
+

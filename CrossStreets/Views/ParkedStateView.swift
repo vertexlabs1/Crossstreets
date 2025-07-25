@@ -56,46 +56,21 @@ struct ParkedStateView: View {
                         .foregroundColor(.secondary)
                         .tracking(0.5)
                     
-                    Text(displayAddress.isEmpty ? "Locating..." : displayAddress)
-                        .font(.system(size: 17, weight: .medium))
-                        .foregroundColor(.primary)
-                        .multilineTextAlignment(.leading)
-                        .lineLimit(2)
-                        .onAppear {
-                            displayAddress = parkedLocation.address
-                        }
-                        .onChange(of: parkedLocation.address) { _, newAddress in
-                            displayAddress = newAddress
-                        }
-                    
-                    // Show notes if they exist
-                    if let notes = parkedLocation.notes, !notes.isEmpty {
-                        HStack(spacing: 6) {
-                            Image(systemName: "note.text")
-                                .font(.system(size: 12))
-                                .foregroundColor(.secondary)
-                            Text(notes)
-                                .font(.system(size: 14))
-                                .foregroundColor(.secondary)
-                                .multilineTextAlignment(.leading)
-                                .lineLimit(2)
-                        }
-                        .padding(.top, 2)
-                    }
-                    
-                    HStack(spacing: 8) {
-                        if let garageName = parkedLocation.garageName {
-                            HStack(spacing: 4) {
-                                Image(systemName: "building.fill")
-                                    .font(.system(size: 12))
-                                    .foregroundColor(.blue)
-                                Text(garageName)
-                                    .font(.system(size: 14, weight: .medium))
-                                    .foregroundColor(.blue)
-                                    .lineLimit(1)
+                    if let garageName = parkedLocation.garageName {
+                        // Garage parking - show garage name as main text
+                        Text(garageName)
+                            .font(.system(size: 17, weight: .medium))
+                            .foregroundColor(.primary)
+                            .multilineTextAlignment(.leading)
+                            .lineLimit(2)
+                            .onAppear {
+                                displayAddress = parkedLocation.address
                             }
-                        }
+                            .onChange(of: parkedLocation.address) { _, newAddress in
+                                displayAddress = newAddress
+                            }
                         
+                        // Show floor information below
                         if let floor = parkedLocation.floor {
                             HStack(spacing: 6) {
                                 Text(floor)
@@ -119,6 +94,37 @@ struct ParkedStateView: View {
                                 .buttonStyle(PlainButtonStyle())
                             }
                         }
+                    } else {
+                        // Street parking - show address as main text
+                        Text(displayAddress.isEmpty ? "Locating..." : displayAddress)
+                            .font(.system(size: 17, weight: .medium))
+                            .foregroundColor(.primary)
+                            .multilineTextAlignment(.leading)
+                            .lineLimit(2)
+                            .onAppear {
+                                displayAddress = parkedLocation.address
+                            }
+                            .onChange(of: parkedLocation.address) { _, newAddress in
+                                displayAddress = newAddress
+                            }
+                    }
+                    
+                    // Show notes if they exist
+                    if let notes = parkedLocation.notes, !notes.isEmpty {
+                        HStack(spacing: 6) {
+                            Image(systemName: "note.text")
+                                .font(.system(size: 12))
+                                .foregroundColor(.secondary)
+                            Text(notes)
+                                .font(.system(size: 14))
+                                .foregroundColor(.secondary)
+                                .multilineTextAlignment(.leading)
+                                .lineLimit(2)
+                        }
+                        .padding(.top, 2)
+                    }
+                    
+                    HStack(spacing: 8) {
                         
                         Spacer()
                         
