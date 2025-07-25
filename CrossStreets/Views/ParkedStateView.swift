@@ -161,7 +161,7 @@ struct ParkedStateView: View {
                         }
                     }
                 }
-                .padding(.horizontal, 16)
+                .padding(.horizontal, 4)
                 
                 HStack(spacing: 12) {
                     Button(action: {
@@ -176,7 +176,7 @@ struct ParkedStateView: View {
                         }
                         .foregroundColor(.white)
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 12)
+                        .padding(.vertical, 15)
                         .background(Color.blue)
                         .cornerRadius(12)
                     }
@@ -200,7 +200,8 @@ struct ParkedStateView: View {
                     .contentShape(Rectangle())
                 }
             }
-            .padding(.bottom, 8)
+            .padding(.horizontal, 20)
+            .padding(.bottom, 10)
             .sheet(isPresented: $showingNotesEditor) {
                 NotesEditorView(
                     showingNotesEditor: $showingNotesEditor,
