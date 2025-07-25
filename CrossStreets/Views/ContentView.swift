@@ -64,7 +64,7 @@ struct ContentView: View {
                 // Only log once per session
                 if !hasLoggedInitialization {
                     hasLoggedInitialization = true
-                    PerformanceMonitor.shared.startAction("app_launch", screen: "main")
+                    PerformanceMonitor.shared.startAction("app_launch")
                 }
             }
             .onChange(of: locationManager.currentLocation) { _, newLocation in
@@ -148,7 +148,7 @@ struct ContentView: View {
     
     private func centerMapOnUser(location: CLLocation) {
         // Start performance monitoring
-        PerformanceMonitor.shared.startAction("center_on_user", screen: "main")
+        PerformanceMonitor.shared.startAction("center_on_user")
         
         withAnimation(.easeInOut(duration: 0.8)) {
             position = .region(MKCoordinateRegion(
