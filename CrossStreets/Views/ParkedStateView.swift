@@ -49,8 +49,8 @@ struct ParkedStateView: View {
         }
         
         return AnyView(
-            VStack(alignment: .leading, spacing: 12) {
-                VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 8) {
+                VStack(alignment: .leading, spacing: 3) {
                     Text("PARKED AT")
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundColor(.secondary)
@@ -121,7 +121,7 @@ struct ParkedStateView: View {
                                 .multilineTextAlignment(.leading)
                                 .lineLimit(2)
                         }
-                        .padding(.top, 2)
+                        .padding(.top, 1)
                     }
                     
                     HStack(spacing: 8) {

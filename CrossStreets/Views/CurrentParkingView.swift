@@ -6,7 +6,7 @@ struct CurrentParkingView: View {
     
     var body: some View {
         if let parking = locationManager.parkedLocation {
-            VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: 8) {
                 HStack {
                     Circle()
                         .fill(Color.blue)
