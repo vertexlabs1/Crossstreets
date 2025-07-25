@@ -19,8 +19,21 @@ class HapticManager {
 
 class DateHelper {
     static func timeAgo(from date: Date) -> String {
-        let formatter = RelativeDateTimeFormatter()
-        formatter.unitsStyle = .short
-        return formatter.localizedString(for: date, relativeTo: Date())
+        let now = Date()
+        let timeInterval = now.timeIntervalSince(date)
+        
+        let minutes = Int(timeInterval / 60)
+        let hours = minutes / 60
+        let remainingMinutes = minutes % 60
+        
+        if hours > 0 {
+            if remainingMinutes > 0 {
+                return "\(hours) hour\(hours == 1 ? "" : "s"), \(remainingMinutes) minute\(remainingMinutes == 1 ? "" : "s") ago"
+            } else {
+                return "\(hours) hour\(hours == 1 ? "" : "s") ago"
+            }
+        } else {
+            return "\(minutes) minute\(minutes == 1 ? "" : "s") ago"
+        }
     }
 }

@@ -8,11 +8,12 @@ struct BottomCard: View {
     @State private var dragOffset: CGFloat = 0
     @State private var isDragging = false
     
-    private let swipeThreshold: CGFloat = 50
-    private let maxDragOffset: CGFloat = 100
+    private let swipeThreshold: CGFloat = 30 // Reduced threshold for easier triggering
+    private let maxDragOffset: CGFloat = 80
     
     var body: some View {
         VStack(spacing: 0) {
+            // Drag indicator with improved gesture area
             VStack(spacing: 4) {
                 RoundedRectangle(cornerRadius: 2.5)
                     .fill(Color.gray.opacity(0.15))
@@ -23,9 +24,11 @@ struct BottomCard: View {
             }
             .padding(.top, 4)
             .padding(.bottom, 10)
+            .padding(.horizontal, 20) // Add horizontal padding for larger touch area
             .offset(y: dragOffset)
+            .contentShape(Rectangle()) // Make entire area tappable
             .gesture(
-                DragGesture()
+                DragGesture(minimumDistance: 5) // Require minimum distance to start
                     .onChanged { value in
                         isDragging = true
                         // Only allow upward drag
@@ -55,6 +58,11 @@ struct BottomCard: View {
                         }
                     }
             )
+            .onTapGesture {
+                // Add haptic feedback for tap
+                HapticManager.lightImpact()
+                showingParkingDetails = true
+            }
             
             Group {
                 if locationManager.parkedLocation != nil {

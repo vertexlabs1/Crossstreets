@@ -1473,4 +1473,44 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
         
         return photos
     }
+    
+    // MARK: - App Lifecycle Management
+    
+    func refreshLocationPermissions() {
+        print("🔄 Refreshing location permissions...")
+        
+        // Check current authorization status
+        let status = locationManager.authorizationStatus
+        print("📍 Current authorization status: \(status.rawValue)")
+        
+        // If we have authorization, restart location services
+        if status == .authorizedWhenInUse || status == .authorizedAlways {
+            print("✅ Location authorized - restarting services")
+            startLocationServices()
+        } else if status == .denied || status == .restricted {
+            print("❌ Location access denied or restricted")
+            // Don't show alert here - let the user handle it in settings
+        } else if status == .notDetermined {
+            print("❓ Location permission not determined - requesting access")
+            locationManager.requestWhenInUseAuthorization()
+        }
+    }
+    
+    func ensureLocationServicesRunning() {
+        print("🔄 Ensuring location services are running...")
+        
+        // Check if location manager is running
+        if !locationManager.isUpdatingLocation {
+            print("⚠️ Location manager not updating - restarting")
+            startLocationServices()
+        } else {
+            print("✅ Location services are running")
+        }
+        
+        // Check if altimeter is running (if available)
+        if CMAltimeter.isRelativeAltitudeAvailable() && !isAltimeterRunning {
+            print("⚠️ Altimeter not running - restarting")
+            startAltimeter()
+        }
+    }
 }
