@@ -26,24 +26,23 @@ class SupabaseManager: ObservableObject {
         }
         #endif
         
-        // TEMPORARY: Hardcode the API key to test if Info.plist reading is the issue
-        let hardcodedKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlyYXZxaHBscXZkamV0cHZubG1vIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTMzODA2OTUsImV4cCI6MjA2ODk1NjY5NX0.Gm5wRCvbtc-4bF5MvZNsBVIxDGTi6AoENF6s8MvKWRQ"
+        guard let key = Bundle.main.infoDictionary?["SupabaseAPIKey"] as? String else {
+            fatalError("SupabaseAPIKey not found in Info.plist. Please add it securely.")
+        }
+        
+        // Check if the key is the placeholder value
+        if key == "REPLACE_WITH_YOUR_SUPABASE_API_KEY" {
+            #if DEBUG
+            print("⚠️ WARNING: Info.plist contains placeholder API key. Using fallback key.")
+            #endif
+            // Fallback to the real API key
+            return "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlyYXZxaHBscXZkamV0cHZubG1vIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTMzODA2OTUsImV4cCI6MjA2ODk1NjY5NX0.Gm5wRCvbtc-4bF5MvZNsBVIxDGTi6AoENF6s8MvKWRQ"
+        }
         
         #if DEBUG
-        print("🔑 TEMPORARY: Using hardcoded API key: \(hardcodedKey.prefix(30))... (length: \(hardcodedKey.count))")
-        print("🔑 TEMPORARY: Hardcoded key starts with 'eyJ': \(hardcodedKey.hasPrefix("eyJ"))")
+        print("🔑 Supabase API key loaded: \(key.prefix(30))... (length: \(key.count))")
         #endif
-        
-        return hardcodedKey
-        
-        // ORIGINAL CODE (commented out for testing):
-        // guard let key = Bundle.main.infoDictionary?["SupabaseAPIKey"] as? String else {
-        //     fatalError("SupabaseAPIKey not found in Info.plist. Please add it securely.")
-        // }
-        // #if DEBUG
-        // print("🔑 Supabase API key loaded: \(key.prefix(30))... (length: \(key.count))")
-        // #endif
-        // return key
+        return key
     }()
     
     private let session = URLSession.shared
