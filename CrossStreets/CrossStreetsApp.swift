@@ -22,28 +22,25 @@ struct CrossStreetsApp: App {
                 // Main ContentView - always present, never recreated
                 ContentView(deepLinkDestination: $deepLinkDestination)
                 
-                // Splash overlay - only shown when showSplash is true
-                if showSplash {
-                    SplashView()
-                        .transition(.asymmetric(
-                            insertion: .opacity.combined(with: .scale(scale: 1.05)),
-                            removal: .opacity.combined(with: .scale(scale: 1.1))
-                        ))
-                        .zIndex(1)
-                        .onAppear {
-                            print("🎬 Splash screen appeared, will dismiss in 2 seconds")
-                            print("⏰ Scheduling splash dismissal timer...")
-                            // Start fade out after 2 seconds
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-                                print("⏰ Splash screen timer fired, dismissing...")
-                                withAnimation(.easeInOut(duration: 1.2)) {
-                                    showSplash = false
-                                    print("✅ Splash screen dismissed (showSplash = false)")
-                                }
+                // Splash overlay - always present but animated
+                SplashView()
+                    .opacity(showSplash ? 1 : 0)
+                    .scaleEffect(showSplash ? 1 : 1.1)
+                    .animation(.easeInOut(duration: 1.2), value: showSplash)
+                    .zIndex(1)
+                    .onAppear {
+                        print("🎬 Splash screen appeared, will dismiss in 2 seconds")
+                        print("⏰ Scheduling splash dismissal timer...")
+                        // Start fade out after 2 seconds
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                            print("⏰ Splash screen timer fired, dismissing...")
+                            withAnimation(.easeInOut(duration: 1.2)) {
+                                showSplash = false
+                                print("✅ Splash screen dismissed (showSplash = false)")
                             }
-                            print("⏰ Splash dismissal timer scheduled successfully")
                         }
-                }
+                        print("⏰ Splash dismissal timer scheduled successfully")
+                    }
                 
                 // Offline indicator - only show after delay and when actually offline
                 if !isOnline && !showSplash && networkCheckDelay {

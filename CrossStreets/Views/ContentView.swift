@@ -28,8 +28,14 @@ struct ContentView: View {
     // Debounce for location updates to prevent excessive recomputations
     @State private var lastLocationUpdate: Date = Date.distantPast
     
+    // Performance optimization: Cache map position to prevent unnecessary updates
+    @State private var lastMapPosition: MapCameraPosition = .automatic
+    
     // Only print initialization log once per app launch
     static var hasPrintedInit = false
+    
+    // Performance optimization: Throttle debug prints
+    @State private var lastDebugPrint: Date = Date.distantPast
     
     init(deepLinkDestination: Binding<String?> = .constant(nil)) {
         self._deepLinkDestination = deepLinkDestination
@@ -43,7 +49,12 @@ struct ContentView: View {
     
     var body: some View {
         #if DEBUG
-        let _ = print("🗺️ ContentView body computed")
+        // Throttle debug prints to reduce log spam
+        let now = Date()
+        if now.timeIntervalSince(lastDebugPrint) >= 5.0 {
+            print("🗺️ ContentView body computed")
+            lastDebugPrint = now
+        }
         #endif
         ZStack {
             Map(position: $position) {

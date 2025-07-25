@@ -14,7 +14,7 @@ class SupabaseManager: ObservableObject {
             fatalError("SupabaseAPIKey not found in Info.plist. Please add it securely.")
         }
         #if DEBUG
-        print("🔑 Supabase API key loaded: \(key.prefix(20))...")
+        print("🔑 Supabase API key loaded: \(key.prefix(30))... (length: \(key.count))")
         #endif
         return key
     }()
