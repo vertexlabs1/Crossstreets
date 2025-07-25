@@ -5,11 +5,6 @@ struct BottomCard: View {
     @Binding var showingFloorPicker: Bool
     @Binding var detectedGarageName: String?
     @State private var showingParkingDetails = false
-    @State private var dragOffset: CGFloat = 0
-    @State private var isDragging = false
-    
-    private let swipeThreshold: CGFloat = 40
-    private let maxDragOffset: CGFloat = 60
     
     var body: some View {
         VStack(spacing: 0) {
@@ -42,35 +37,20 @@ struct BottomCard: View {
                 }
             }
         }
-        .offset(y: dragOffset)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            print("🎯 BottomCard tapped - opening parking details")
+            HapticManager.lightImpact()
+            showingParkingDetails = true
+        }
         .gesture(
-            DragGesture(minimumDistance: 10)
-                .onChanged { value in
-                    isDragging = true
-                    // Only allow upward drag
-                    let newOffset = min(0, -value.translation.height)
-                    dragOffset = max(-maxDragOffset, newOffset)
-                    
-                    // Add haptic feedback when crossing threshold
-                    if abs(dragOffset) > swipeThreshold && !showingParkingDetails {
-                        HapticManager.lightImpact()
-                    }
-                }
+            DragGesture(minimumDistance: 20)
                 .onEnded { value in
-                    isDragging = false
-                    
-                    // Check if swipe threshold was met
-                    if abs(dragOffset) > swipeThreshold {
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                            showingParkingDetails = true
-                            dragOffset = 0
-                        }
+                    // Check if it's an upward swipe
+                    if value.translation.height < -30 && abs(value.translation.width) < 50 {
+                        print("🎯 BottomCard swiped up - opening parking details")
                         HapticManager.mediumImpact()
-                    } else {
-                        // Reset position if threshold not met
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                            dragOffset = 0
-                        }
+                        showingParkingDetails = true
                     }
                 }
         )
