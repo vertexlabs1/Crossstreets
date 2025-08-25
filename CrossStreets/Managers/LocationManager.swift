@@ -322,7 +322,7 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
         locationManager.desiredAccuracy = kCLLocationAccuracyBest
         locationManager.distanceFilter = 10 // More frequent updates while driving
         
-        if !locationManager.location?.coordinate.isValid ?? true {
+        if locationManager.location == nil {
             locationManager.startUpdatingLocation()
         }
     }
