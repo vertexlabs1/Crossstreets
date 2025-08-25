@@ -289,14 +289,20 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     // MARK: - Motion Activity Processing
     
     private func processMotionActivity(_ activity: CMMotionActivity) {
-        #if DEBUG
-        print("🚶 Motion activity: \(activity.automotive ? "Driving" : "Not driving") - Confidence: \(activity.confidence.rawValue)")
-        #endif
+        // Only log significant state changes to reduce console spam
+        let isDriving = activity.automotive && activity.confidence != .low
+        let wasDriving = autoParkingStatus == .driving
+        
+        if isDriving != wasDriving {
+            #if DEBUG
+            print("🚶 Motion activity: \(activity.automotive ? "Driving" : "Not driving") - Confidence: \(activity.confidence.rawValue)")
+            #endif
+        }
         
         // Check if we're driving with high confidence
-        if activity.automotive && activity.confidence != .low {
+        if isDriving {
             handleDrivingDetected()
-        } else if (activity.stationary || activity.walking) && autoParkingStatus == .driving {
+        } else if (activity.stationary || activity.walking) && wasDriving {
             handleDrivingStopped()
         }
     }
