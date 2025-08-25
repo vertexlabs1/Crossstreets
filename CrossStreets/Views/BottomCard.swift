@@ -36,8 +36,8 @@ struct BottomCard: View {
             RoundedRectangle(cornerRadius: 2.5)
                 .fill(Color.gray.opacity(0.3))
                 .frame(width: 36, height: 5)
-                .padding(.top, 8)
-                .padding(.bottom, 4)
+                .padding(.top, 16)
+                .padding(.bottom, 12)
             
             Group {
                 if locationManager.parkedLocation != nil {
@@ -54,6 +54,8 @@ struct BottomCard: View {
                     )
                 }
             }
+            .padding(.horizontal, 20)
+            .padding(.bottom, 20)
         }
         .background(Color(.systemBackground))
         .cornerRadius(20, corners: [UIRectCorner.topLeft, UIRectCorner.topRight])

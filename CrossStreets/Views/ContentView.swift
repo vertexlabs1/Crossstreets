@@ -63,7 +63,6 @@ struct ContentView: View {
                 MapCompass()
                 MapScaleView()
             }
-            .ignoresSafeArea()
             .onAppear {
                 #if DEBUG
                 print("🗺️ Map view appeared at \(Date())")
@@ -121,6 +120,11 @@ struct ContentView: View {
                     .padding(.trailing, 32)
                     .padding(.bottom, 20)
                 }
+            }
+            
+            // Bottom card and tab bar positioned above safe area
+            VStack(spacing: 0) {
+                Spacer()
                 
                 VStack(spacing: 0) {
                     if selectedTab == 0 {
@@ -130,20 +134,25 @@ struct ContentView: View {
                             detectedGarageName: $detectedGarageName
                         )
                     }
+                    
                     Divider()
+                        .padding(.horizontal, 16)
+                    
                     TabBarView(
                         selectedTab: $selectedTab,
                         showHistorySheet: $showHistorySheet,
                         showSettingsSheet: $showSettingsSheet
                     )
                 }
-                .padding(.horizontal, 16)
                 .background(
                     Color(.systemBackground)
                         .cornerRadius(28, corners: [UIRectCorner.topLeft, UIRectCorner.topRight])
                         .shadow(color: .black.opacity(0.1), radius: 25, y: -10)
-                        .edgesIgnoringSafeArea(.bottom)
                 )
+                .padding(.bottom, 0)
+            }
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                Color.clear.frame(height: 0)
             }
             
             if showingFloorPicker {

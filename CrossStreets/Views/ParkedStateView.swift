@@ -44,8 +44,8 @@ struct ParkedStateView: View {
         }
         
         return AnyView(
-            VStack(alignment: .leading, spacing: 6) {
-                VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 8) {
+                VStack(alignment: .leading, spacing: 6) {
                     Text("PARKED AT")
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundColor(.secondary)
@@ -83,6 +83,7 @@ struct ParkedStateView: View {
                                 }
                                 .buttonStyle(PlainButtonStyle())
                             }
+                            .padding(.top, 2)
                         }
                     } else {
                         Text(displayAddress.isEmpty ? "Locating..." : displayAddress)
@@ -108,11 +109,11 @@ struct ParkedStateView: View {
                                 .multilineTextAlignment(.leading)
                                 .lineLimit(2)
                         }
-                        .padding(.top, 1)
+                        .padding(.top, 4)
                     }
                     HStack(spacing: 4) {
                         Spacer()
-                        VStack(alignment: .trailing, spacing: 1) {
+                        VStack(alignment: .trailing, spacing: 2) {
                             HStack {
                                 Spacer()
                                 // Removed notes icon/button here
@@ -129,10 +130,11 @@ struct ParkedStateView: View {
                                 }
                             }
                         }
+                        .padding(.top, 2)
                     }
                 }
+                .padding(.bottom, 12)
                 .padding(.horizontal, 4)
-                .padding(.bottom, 4)
                 HStack(spacing: 12) {
                     Button(action: {
                         HapticManager.lightImpact()
@@ -166,8 +168,7 @@ struct ParkedStateView: View {
                     .buttonStyle(PlainButtonStyle())
                 }
             }
-            .padding(.horizontal, 20)
-            .padding(.bottom, 10)
+            .padding(.bottom, 12)
         )
     }
 }

@@ -77,7 +77,6 @@ struct NotParkedStateView: View {
                 )
             }
             .disabled(locationManager.isDetectingParking)
-            .padding(.horizontal, 20)
             .buttonStyle(PlainButtonStyle())
             
             // Report Issue Button (only show when detection completed without garage)
@@ -100,7 +99,8 @@ struct NotParkedStateView: View {
                 .buttonStyle(PlainButtonStyle())
             }
         }
-        .padding(.bottom, 10)
+        .padding(.bottom, 12)
+        .padding(.horizontal, 4)
         .alert("Report Detection Issue", isPresented: $showReportIssue) {
             Button("Cancel", role: .cancel) { }
             Button("Report") {

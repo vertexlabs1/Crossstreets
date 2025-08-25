@@ -63,7 +63,8 @@ struct CurrentParkingView: View {
                         }
                         Spacer()
                     }
-                    .padding(16)
+                    .padding(.vertical, 12)
+                    .padding(.horizontal, 16)
                     .background(Color.blue.opacity(0.05))
                     .cornerRadius(10)
                 }
