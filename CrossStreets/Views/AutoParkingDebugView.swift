@@ -76,6 +76,20 @@ struct AutoParkingDebugView: View {
                                 .foregroundColor(.white)
                                 .cornerRadius(12)
                             }
+                            
+                            Button(action: {
+                                locationManager.resetAutoParkingState()
+                            }) {
+                                HStack {
+                                    Image(systemName: "arrow.clockwise.circle.fill")
+                                    Text("Reset Auto Parking State")
+                                }
+                                .frame(maxWidth: .infinity)
+                                .padding()
+                                .background(Color.red)
+                                .foregroundColor(.white)
+                                .cornerRadius(12)
+                            }
                         }
                     }
                     

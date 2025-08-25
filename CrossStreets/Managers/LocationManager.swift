@@ -292,17 +292,25 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
         // Only log significant state changes to reduce console spam
         let isDriving = activity.automotive && activity.confidence != .low
         let wasDriving = autoParkingStatus == .driving
+        let wasInDrivingState = autoParkingStatus == .driving || autoParkingStatus == .confirmed
         
         if isDriving != wasDriving {
             #if DEBUG
             print("🚶 Motion activity: \(activity.automotive ? "Driving" : "Not driving") - Confidence: \(activity.confidence.rawValue)")
+            print("   - Current status: \(autoParkingStatus.description)")
+            print("   - Was in driving state: \(wasInDrivingState)")
             #endif
         }
         
         // Check if we're driving with high confidence
         if isDriving {
             handleDrivingDetected()
-        } else if (activity.stationary || activity.walking) && wasDriving {
+        } else if (activity.stationary || activity.walking) && wasInDrivingState {
+            #if DEBUG
+            print("🛑 Motion activity: Stopped driving - triggering parking detection")
+            print("   - Activity: \(activity.stationary ? "Stationary" : "Walking")")
+            print("   - Was in driving state: \(wasInDrivingState)")
+            #endif
             handleDrivingStopped()
         }
     }
@@ -310,12 +318,20 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     private func handleDrivingDetected() {
         if autoParkingStatus != .driving {
             print("🚗 Driving detected - starting driving mode")
+            print("   - Previous status: \(autoParkingStatus.description)")
             
             // Clear any existing parking location when starting to drive
             if parkedLocation != nil {
                 print("🗑️ Clearing previous parking location - starting new trip")
                 clearParkedLocation()
             }
+            
+            // Reset any existing parking detection state
+            autoParkingTimer?.invalidate()
+            autoParkingTimer = nil
+            lastSignificantLocation = nil
+            stationaryStartTime = nil
+            
             autoParkingStatus = .driving
             startDrivingMode()
         }
@@ -323,6 +339,14 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     
     private func handleDrivingStopped() {
         print("🛑 Driving stopped - beginning parking detection")
+        print("   - Previous status: \(autoParkingStatus.description)")
+        
+        // Ensure we're not already detecting
+        if autoParkingStatus == .detecting {
+            print("⚠️ Already detecting parking - ignoring duplicate stop event")
+            return
+        }
+        
         autoParkingStatus = .detecting
         beginParkingDetection()
     }
@@ -2004,5 +2028,21 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
         @unknown default:
             print("❓ Unknown authorization status: \(status)")
         }
+    }
+    
+    // MARK: - Debug and Reset Methods
+    
+    func resetAutoParkingState() {
+        print("🔄 Resetting auto parking state for debugging")
+        print("   - Previous status: \(autoParkingStatus.description)")
+        
+        // Reset all auto parking state
+        autoParkingStatus = .idle
+        autoParkingTimer?.invalidate()
+        autoParkingTimer = nil
+        lastSignificantLocation = nil
+        stationaryStartTime = nil
+        
+        print("   - New status: \(autoParkingStatus.description)")
     }
 }
