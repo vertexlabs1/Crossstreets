@@ -120,12 +120,8 @@ struct ContentView: View {
                     .padding(.trailing, 32)
                     .padding(.bottom, 20)
                 }
-            }
-            
-            // Bottom card and tab bar positioned above safe area
-            VStack(spacing: 0) {
-                Spacer()
                 
+                // Bottom card and tab bar
                 VStack(spacing: 0) {
                     if selectedTab == 0 {
                         BottomCard(
@@ -149,7 +145,6 @@ struct ContentView: View {
                         .cornerRadius(28, corners: [UIRectCorner.topLeft, UIRectCorner.topRight])
                         .shadow(color: .black.opacity(0.1), radius: 25, y: -10)
                 )
-                .padding(.bottom, 0)
             }
             .safeAreaInset(edge: .bottom, spacing: 0) {
                 Color.clear.frame(height: 0)

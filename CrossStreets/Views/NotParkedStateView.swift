@@ -9,8 +9,8 @@ struct NotParkedStateView: View {
     @State private var hasCompletedDetection = false
     
     var body: some View {
-        VStack(spacing: 14) {
-            VStack(spacing: 4) {
+        VStack(spacing: 16) {
+            VStack(spacing: 6) {
                 Text("Where's your car?")
                     .font(.system(size: 24, weight: .semibold))
                     .foregroundColor(.primary)
@@ -18,6 +18,7 @@ struct NotParkedStateView: View {
                     .font(.system(size: 16))
                     .foregroundColor(.secondary)
             }
+            .padding(.top, 4)
             
             Button(action: {
                 // Prevent feedback loop: Only trigger if not already detecting

@@ -44,12 +44,13 @@ struct ParkedStateView: View {
         }
         
         return AnyView(
-            VStack(alignment: .leading, spacing: 8) {
-                VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: 10) {
+                VStack(alignment: .leading, spacing: 8) {
                     Text("PARKED AT")
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundColor(.secondary)
                         .tracking(0.5)
+                        .padding(.top, 4)
                     
                     if let garageName = parkedLocation.garageName {
                         Text(garageName)
@@ -83,7 +84,7 @@ struct ParkedStateView: View {
                                 }
                                 .buttonStyle(PlainButtonStyle())
                             }
-                            .padding(.top, 2)
+                            .padding(.top, 4)
                         }
                     } else {
                         Text(displayAddress.isEmpty ? "Locating..." : displayAddress)
@@ -109,11 +110,11 @@ struct ParkedStateView: View {
                                 .multilineTextAlignment(.leading)
                                 .lineLimit(2)
                         }
-                        .padding(.top, 4)
+                        .padding(.top, 6)
                     }
                     HStack(spacing: 4) {
                         Spacer()
-                        VStack(alignment: .trailing, spacing: 2) {
+                        VStack(alignment: .trailing, spacing: 3) {
                             HStack {
                                 Spacer()
                                 // Removed notes icon/button here
@@ -130,10 +131,10 @@ struct ParkedStateView: View {
                                 }
                             }
                         }
-                        .padding(.top, 2)
+                        .padding(.top, 4)
                     }
                 }
-                .padding(.bottom, 12)
+                .padding(.bottom, 16)
                 .padding(.horizontal, 4)
                 HStack(spacing: 12) {
                     Button(action: {
