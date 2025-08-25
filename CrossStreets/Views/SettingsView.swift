@@ -4,6 +4,7 @@ struct SettingsView: View {
     @ObservedObject var locationManager: LocationManager
     @Binding var selectedTab: Int
     @State private var showingLogIssue = false
+    @State private var showingAutoParkingDebug = false
     
     var body: some View {
         VStack(spacing: 0) {
@@ -283,6 +284,36 @@ struct SettingsView: View {
                             }
                             .buttonStyle(PlainButtonStyle())
                             
+                            #if DEBUG
+                            Button(action: { showingAutoParkingDebug = true }) {
+                                HStack(spacing: 12) {
+                                    Image(systemName: "car.circle.fill")
+                                        .font(.system(size: 18))
+                                        .foregroundColor(.orange)
+                                        .frame(width: 24, height: 24)
+                                    
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text("Auto Parking Debug")
+                                            .font(.system(size: 16, weight: .medium))
+                                            .foregroundColor(.orange)
+                                        
+                                        Text("Test automatic parking detection")
+                                            .font(.system(size: 13))
+                                            .foregroundColor(.secondary)
+                                    }
+                                    
+                                    Spacer()
+                                    
+                                    Image(systemName: "arrow.up.right")
+                                        .font(.system(size: 14, weight: .medium))
+                                        .foregroundColor(.orange)
+                                }
+                                .padding(12)
+                                .background(RoundedRectangle(cornerRadius: 8).fill(Color(.systemGray6)))
+                            }
+                            .buttonStyle(PlainButtonStyle())
+                            #endif
+                            
                             VStack(alignment: .leading, spacing: 8) {
                                 Text("Free app, consider supporting the dev team")
                                     .font(.system(size: 14, weight: .medium))
@@ -336,6 +367,9 @@ struct SettingsView: View {
         .navigationBarTitleDisplayMode(.large)
         .sheet(isPresented: $showingLogIssue) {
             LogIssueView(locationManager: locationManager)
+        }
+        .sheet(isPresented: $showingAutoParkingDebug) {
+            AutoParkingDebugView(locationManager: locationManager)
         }
 
     }
