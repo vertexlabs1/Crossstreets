@@ -310,6 +310,12 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     private func handleDrivingDetected() {
         if autoParkingStatus != .driving {
             print("🚗 Driving detected - starting driving mode")
+            
+            // Clear any existing parking location when starting to drive
+            if parkedLocation != nil {
+                print("🗑️ Clearing previous parking location - starting new trip")
+                clearParkedLocation()
+            }
             autoParkingStatus = .driving
             startDrivingMode()
         }
