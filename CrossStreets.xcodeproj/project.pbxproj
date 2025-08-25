@@ -405,7 +405,7 @@
 				CODE_SIGN_ENTITLEMENTS = CrossStreetsWidgetExtension.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 3;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = CrossStreetsWidget/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = CrossStreetsWidget;
@@ -434,7 +434,7 @@
 				CODE_SIGN_ENTITLEMENTS = CrossStreetsWidgetExtension.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 3;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = CrossStreetsWidget/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = CrossStreetsWidget;
@@ -584,7 +584,7 @@
 				CODE_SIGN_ENTITLEMENTS = CrossStreets/CrossStreets.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 3;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = CrossStreets/Info.plist;
@@ -620,7 +620,7 @@
 				CODE_SIGN_ENTITLEMENTS = CrossStreets/CrossStreets.entitlements;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 2;
+				CURRENT_PROJECT_VERSION = 3;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = CrossStreets/Info.plist;
