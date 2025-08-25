@@ -9,6 +9,7 @@ struct SplashView: View {
                 .aspectRatio(contentMode: .fill)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .clipped()
+                .ignoresSafeArea()
             
             // Optional overlay for additional branding
             VStack {
@@ -25,11 +26,8 @@ struct SplashView: View {
                         .foregroundColor(.white.opacity(0.9))
                         .tracking(1)
                 }
-                .padding(.bottom, 100)
+                .padding(.bottom, 60)
             }
-        }
-        .safeAreaInset(edge: .bottom, spacing: 0) {
-            Color.clear.frame(height: 0)
         }
     }
 }

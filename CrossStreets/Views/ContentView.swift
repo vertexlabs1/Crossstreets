@@ -48,117 +48,113 @@ struct ContentView: View {
     }
     
     var body: some View {
-        VStack(spacing: 0) {
-            // Map takes up remaining space
-            ZStack {
-                Map(position: $position) {
-                    UserAnnotation()
-                    if let parkedLocation = locationManager.parkedLocation {
-                        Annotation("Parked Car", coordinate: parkedLocation.coordinate) {
-                            ParkingAnnotationView(location: parkedLocation)
-                        }
+        ZStack {
+            Map(position: $position) {
+                UserAnnotation()
+                if let parkedLocation = locationManager.parkedLocation {
+                    Annotation("Parked Car", coordinate: parkedLocation.coordinate) {
+                        ParkingAnnotationView(location: parkedLocation)
                     }
                 }
-                .mapStyle(.standard)
-                .mapControls { 
-                    MapUserLocationButton()
-                    MapCompass()
-                    MapScaleView()
+            }
+            .mapStyle(.standard)
+            .mapControls { 
+                MapUserLocationButton()
+                MapCompass()
+                MapScaleView()
+            }
+            .ignoresSafeArea()
+            .onAppear {
+                #if DEBUG
+                print("🗺️ Map view appeared at \(Date())")
+                #endif
+                // Only log once per session
+                if !hasLoggedInitialization {
+                    hasLoggedInitialization = true
+                    PerformanceMonitor.shared.startAction("app_launch")
                 }
-                .onAppear {
-                    #if DEBUG
-                    print("🗺️ Map view appeared at \(Date())")
-                    #endif
-                    // Only log once per session
-                    if !hasLoggedInitialization {
-                        hasLoggedInitialization = true
-                        PerformanceMonitor.shared.startAction("app_launch")
-                    }
-                }
-                .onChange(of: locationManager.currentLocation) { _, newLocation in
-                    // Debounce location updates to prevent excessive view rebuilds
-                    let now = Date()
-                    guard now.timeIntervalSince(lastLocationUpdate) >= 1.0 else { return }
-                    lastLocationUpdate = now
-                    
-                    if let location = newLocation {
-                        centerMapOnUser(location: location)
-                    }
-                }
-                .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
-                    print("🔄 App will enter foreground - refreshing location permissions")
-                    // Refresh location permissions when app comes back from background
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                        locationManager.refreshLocationPermissions()
-                    }
-                }
-                .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
-                    print("🔄 App did become active - ensuring location services are running")
-                    // Ensure location services are properly running
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                        locationManager.ensureLocationServicesRunning()
-                    }
-                }
+            }
+            .onChange(of: locationManager.currentLocation) { _, newLocation in
+                // Debounce location updates to prevent excessive view rebuilds
+                let now = Date()
+                guard now.timeIntervalSince(lastLocationUpdate) >= 1.0 else { return }
+                lastLocationUpdate = now
                 
-                // Custom location button overlay
-                VStack {
-                    Spacer()
-                    HStack {
-                        Spacer()
-                        Button(action: {
-                            if let location = locationManager.currentLocation {
-                                centerMapOnUser(location: location)
-                            }
-                        }) {
-                            Image(systemName: "location.fill")
-                                .font(.system(size: 16, weight: .semibold))
-                                .foregroundColor(.white)
-                                .frame(width: 44, height: 44)
-                                .background(Color.blue)
-                                .clipShape(Circle())
-                                .shadow(color: .black.opacity(0.2), radius: 8, y: 4)
-                        }
-                        .padding(.trailing, 32)
-                        .padding(.bottom, 20)
-                    }
+                if let location = newLocation {
+                    centerMapOnUser(location: location)
                 }
-                
-                // Floor picker overlay
-                if showingFloorPicker {
-                    FloorPickerView(
-                        showingFloorPicker: $showingFloorPicker,
-                        locationManager: locationManager,
-                        garageName: detectedGarageName ?? "Parking Garage"
-                    )
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
-                    .zIndex(2)
+            }
+            .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
+                print("🔄 App will enter foreground - refreshing location permissions")
+                // Refresh location permissions when app comes back from background
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    locationManager.refreshLocationPermissions()
+                }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
+                print("🔄 App did become active - ensuring location services are running")
+                // Ensure location services are properly running
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    locationManager.ensureLocationServicesRunning()
                 }
             }
             
-            // Bottom card and tab bar - fixed at bottom
-            VStack(spacing: 0) {
-                if selectedTab == 0 {
-                    BottomCard(
-                        locationManager: locationManager,
-                        showingFloorPicker: $showingFloorPicker,
-                        detectedGarageName: $detectedGarageName
-                    )
+            VStack {
+                Spacer()
+                
+                // Custom location button positioned above bottom card
+                HStack {
+                    Spacer()
+                    Button(action: {
+                        if let location = locationManager.currentLocation {
+                            centerMapOnUser(location: location)
+                        }
+                    }) {
+                        Image(systemName: "location.fill")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundColor(.white)
+                            .frame(width: 44, height: 44)
+                            .background(Color.blue)
+                            .clipShape(Circle())
+                            .shadow(color: .black.opacity(0.2), radius: 8, y: 4)
+                    }
+                    .padding(.trailing, 32)
+                    .padding(.bottom, 20)
                 }
                 
-                Divider()
-                    .padding(.horizontal, 16)
-                
-                TabBarView(
-                    selectedTab: $selectedTab,
-                    showHistorySheet: $showHistorySheet,
-                    showSettingsSheet: $showSettingsSheet
+                VStack(spacing: 0) {
+                    if selectedTab == 0 {
+                        BottomCard(
+                            locationManager: locationManager,
+                            showingFloorPicker: $showingFloorPicker,
+                            detectedGarageName: $detectedGarageName
+                        )
+                    }
+                    Divider()
+                    TabBarView(
+                        selectedTab: $selectedTab,
+                        showHistorySheet: $showHistorySheet,
+                        showSettingsSheet: $showSettingsSheet
+                    )
+                }
+                .padding(.horizontal, 16)
+                .background(
+                    Color(.systemBackground)
+                        .cornerRadius(28, corners: [UIRectCorner.topLeft, UIRectCorner.topRight])
+                        .shadow(color: .black.opacity(0.1), radius: 25, y: -10)
+                        .edgesIgnoringSafeArea(.bottom)
                 )
             }
-            .background(
-                Color(.systemBackground)
-                    .cornerRadius(28, corners: [UIRectCorner.topLeft, UIRectCorner.topRight])
-                    .shadow(color: .black.opacity(0.1), radius: 25, y: -10)
-            )
+            
+            if showingFloorPicker {
+                FloorPickerView(
+                    showingFloorPicker: $showingFloorPicker,
+                    locationManager: locationManager,
+                    garageName: detectedGarageName ?? "Parking Garage"
+                )
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+                .zIndex(2)
+            }
         }
         .onAppear {
             // Request location permission on app launch

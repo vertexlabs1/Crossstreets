@@ -11,6 +11,7 @@ struct FloorPickerView: View {
     var body: some View {
         ZStack {
             Color.black.opacity(0.4)
+                .ignoresSafeArea()
                 .onTapGesture {
                     showingFloorPicker = false
                 }
@@ -18,30 +19,16 @@ struct FloorPickerView: View {
             VStack {
                 Spacer()
                 
-                VStack(spacing: 16) { // Reduced spacing from 20 to 16
+                VStack(spacing: 20) {
                     // Header
-                    VStack(spacing: 6) { // Reduced spacing from 8 to 6
-                        // Simple car icon
-                        Image(systemName: "car.fill")
-                            .font(.system(size: 36))
+                    VStack(spacing: 8) {
+                        Image(systemName: "building.2.fill")
+                            .font(.system(size: 40))
                             .foregroundColor(.blue)
-                            .padding(.bottom, 2) // Reduced padding
-                        
-                        // Garage name for context
-                        Text(garageName)
-                            .font(.title) // Increased from headline to title for more prominence
-                            .fontWeight(.bold) // Changed from semibold to bold
-                            .foregroundColor(.primary)
-                            .multilineTextAlignment(.center)
-                            .lineLimit(2)
-                            .padding(.horizontal)
-                            .padding(.bottom, 2) // Add spacing between garage name and "Select Your Floor"
                         
                         Text("Select Your Floor")
-                            .font(.title) // Large font for visibility
-                            .fontWeight(.black) // Maximum prominence
-                            .foregroundColor(.black) // Same color as floor button text
-                            .padding(.bottom, 8) // Add bottom padding to separate from description
+                            .font(.title2)
+                            .fontWeight(.semibold)
                         
                         if let detectedFloor = detectedFloor, garageName != "Custom Location" {
                             Text("We detected you're on **\(detectedFloor)**. Please correct if this is wrong so we can learn!")

@@ -9,8 +9,8 @@ struct NotParkedStateView: View {
     @State private var hasCompletedDetection = false
     
     var body: some View {
-        VStack(spacing: 16) {
-            VStack(spacing: 6) {
+        VStack(spacing: 14) {
+            VStack(spacing: 4) {
                 Text("Where's your car?")
                     .font(.system(size: 24, weight: .semibold))
                     .foregroundColor(.primary)
@@ -18,7 +18,6 @@ struct NotParkedStateView: View {
                     .font(.system(size: 16))
                     .foregroundColor(.secondary)
             }
-            .padding(.top, 4)
             
             Button(action: {
                 // Prevent feedback loop: Only trigger if not already detecting
@@ -78,6 +77,7 @@ struct NotParkedStateView: View {
                 )
             }
             .disabled(locationManager.isDetectingParking)
+            .padding(.horizontal, 20)
             .buttonStyle(PlainButtonStyle())
             
             // Report Issue Button (only show when detection completed without garage)
@@ -100,8 +100,7 @@ struct NotParkedStateView: View {
                 .buttonStyle(PlainButtonStyle())
             }
         }
-        .padding(.bottom, 12)
-        .padding(.horizontal, 4)
+        .padding(.bottom, 10)
         .alert("Report Detection Issue", isPresented: $showReportIssue) {
             Button("Cancel", role: .cancel) { }
             Button("Report") {
