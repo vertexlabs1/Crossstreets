@@ -81,6 +81,46 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     @Published var gpsVerticalAccuracy: Double?
     @Published var sensorDataQuality: SensorDataQuality = .unknown
     
+    // MARK: - Automatic Parking Detection Properties
+    @Published var isAutoParkingEnabled = true
+    @Published var autoParkingStatus: AutoParkingStatus = .idle
+    @Published var lastMotionActivity: CMMotionActivity?
+    
+    // Auto parking detection state
+    private var motionActivityManager = CMMotionActivityManager()
+    private var lastSignificantLocation: CLLocation?
+    private var stationaryStartTime: Date?
+    private var autoParkingTimer: Timer?
+    private var locationHistory: [CLLocation] = []
+    private let maxLocationHistory = 10
+    
+    // Auto parking configuration
+    private let stationaryThreshold: TimeInterval = 120 // 2 minutes stationary
+    private let significantDistanceThreshold: CLLocationDistance = 50 // 50 meters
+    private let autoParkingConfidenceThreshold: Double = 0.7
+    private let drivingDetectionThreshold: TimeInterval = 90 // 90 seconds of driving
+    
+    // Auto parking status enum
+    enum AutoParkingStatus {
+        case idle
+        case monitoring
+        case driving
+        case detecting
+        case confirmed
+        case failed
+        
+        var description: String {
+            switch self {
+            case .idle: return "Idle"
+            case .monitoring: return "Monitoring movement"
+            case .driving: return "Driving detected"
+            case .detecting: return "Detecting parking"
+            case .confirmed: return "Parking confirmed"
+            case .failed: return "Detection failed"
+            }
+        }
+    }
+    
     // Sensor data quality enum
     enum SensorDataQuality {
         case excellent
@@ -148,6 +188,8 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
         setupLocationManager()
         // Network monitoring removed - using shared status from app level
         setupAltimeter()
+        setupMotionDetection()
+        setupNotificationCategories()
         loadParkedLocation() // Keep this - needed for parked car location
         // Removed: loadFloorCorrections() - now handled by Supabase
         // Removed: loadUserIssues() - now handled by Supabase  
@@ -157,6 +199,8 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     deinit {
         // Network monitoring removed - using shared status from app level
         stopAltimeter()
+        stopMotionActivityMonitoring()
+        autoParkingTimer?.invalidate()
     }
     
     private func setupLocationManager() {
@@ -177,6 +221,288 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
         
         print("✅ Barometric altimeter available - starting monitoring")
         startAltimeter()
+    }
+    
+    // MARK: - Motion Detection Setup
+    
+    private func setupMotionDetection() {
+        guard CMMotionActivityManager.isActivityAvailable() else {
+            print("⚠️ Motion activity monitoring not available on this device")
+            return
+        }
+        
+        print("✅ Motion activity monitoring available - starting automatic parking detection")
+        startMotionActivityMonitoring()
+    }
+    
+    private func startMotionActivityMonitoring() {
+        motionActivityManager.startActivityUpdates(to: .main) { [weak self] activity in
+            guard let self = self, let activity = activity else { return }
+            
+            DispatchQueue.main.async {
+                self.lastMotionActivity = activity
+                self.processMotionActivity(activity)
+            }
+        }
+    }
+    
+    private func stopMotionActivityMonitoring() {
+        motionActivityManager.stopActivityUpdates()
+    }
+    
+    // MARK: - Notification Categories Setup
+    
+    private func setupNotificationCategories() {
+        // Create notification actions
+        let selectFloorAction = UNNotificationAction(
+            identifier: "SELECT_FLOOR",
+            title: "Select Floor",
+            options: [.foreground]
+        )
+        
+        let editLocationAction = UNNotificationAction(
+            identifier: "EDIT_LOCATION",
+            title: "Edit Location",
+            options: [.foreground]
+        )
+        
+        let dismissAction = UNNotificationAction(
+            identifier: "DISMISS",
+            title: "Dismiss",
+            options: []
+        )
+        
+        // Create notification category
+        let parkingDetectionCategory = UNNotificationCategory(
+            identifier: "PARKING_DETECTION",
+            actions: [selectFloorAction, editLocationAction, dismissAction],
+            intentIdentifiers: [],
+            options: []
+        )
+        
+        // Register the category
+        UNUserNotificationCenter.current().setNotificationCategories([parkingDetectionCategory])
+        
+        print("✅ Notification categories set up for automatic parking detection")
+    }
+    
+    // MARK: - Motion Activity Processing
+    
+    private func processMotionActivity(_ activity: CMMotionActivity) {
+        #if DEBUG
+        print("🚶 Motion activity: \(activity.automotive ? "Driving" : "Not driving") - Confidence: \(activity.confidence.rawValue)")
+        #endif
+        
+        // Check if we're driving with high confidence
+        if activity.automotive && activity.confidence != .low {
+            handleDrivingDetected()
+        } else if (activity.stationary || activity.walking) && autoParkingStatus == .driving {
+            handleDrivingStopped()
+        }
+    }
+    
+    private func handleDrivingDetected() {
+        if autoParkingStatus != .driving {
+            print("🚗 Driving detected - starting driving mode")
+            autoParkingStatus = .driving
+            startDrivingMode()
+        }
+    }
+    
+    private func handleDrivingStopped() {
+        print("🛑 Driving stopped - beginning parking detection")
+        autoParkingStatus = .detecting
+        beginParkingDetection()
+    }
+    
+    // MARK: - Driving Mode Management
+    
+    private func startDrivingMode() {
+        // Switch to high-accuracy location updates while driving
+        locationManager.desiredAccuracy = kCLLocationAccuracyBest
+        locationManager.distanceFilter = 10 // More frequent updates while driving
+        
+        if !locationManager.location?.coordinate.isValid ?? true {
+            locationManager.startUpdatingLocation()
+        }
+    }
+    
+    private func stopDrivingMode() {
+        // Switch back to power-efficient location updates
+        locationManager.desiredAccuracy = kCLLocationAccuracyNearestTenMeters
+        locationManager.distanceFilter = 100
+        
+        // Switch to significant location changes for background monitoring
+        if CLLocationManager.significantLocationChangeMonitoringAvailable() {
+            locationManager.stopUpdatingLocation()
+            locationManager.startMonitoringSignificantLocationChanges()
+        }
+    }
+    
+    // MARK: - Automatic Parking Detection
+    
+    private func beginParkingDetection() {
+        guard let currentLocation = currentLocation else {
+            print("❌ No current location for parking detection")
+            autoParkingStatus = .failed
+            return
+        }
+        
+        // Store the location where we stopped
+        lastSignificantLocation = currentLocation
+        stationaryStartTime = Date()
+        
+        // Start a timer to evaluate parking after stationary threshold
+        autoParkingTimer?.invalidate()
+        autoParkingTimer = Timer.scheduledTimer(withTimeInterval: stationaryThreshold, repeats: false) { [weak self] _ in
+            self?.evaluateParkingCandidate()
+        }
+        
+        print("⏱️ Parking detection timer started (\(stationaryThreshold)s)")
+    }
+    
+    private func evaluateParkingCandidate() {
+        guard let lastLocation = lastSignificantLocation,
+              let startTime = stationaryStartTime else {
+            print("❌ Missing location data for parking evaluation")
+            autoParkingStatus = .failed
+            return
+        }
+        
+        guard let currentLocation = currentLocation else {
+            print("❌ No current location for parking evaluation")
+            autoParkingStatus = .failed
+            return
+        }
+        
+        // Check if we're still stationary
+        let timeStationary = Date().timeIntervalSince(startTime)
+        let distanceMoved = currentLocation.distance(from: lastLocation)
+        let currentSpeed = currentLocation.speed
+        
+        print("🔍 Parking evaluation:")
+        print("   - Time stationary: \(timeStationary)s")
+        print("   - Distance moved: \(distanceMoved)m")
+        print("   - Current speed: \(currentSpeed)m/s")
+        
+        // Parking criteria
+        let isStationaryLongEnough = timeStationary >= stationaryThreshold
+        let hasMovedLittle = distanceMoved < significantDistanceThreshold
+        let isSlowOrStopped = currentSpeed < 1.0
+        
+        if isStationaryLongEnough && hasMovedLittle && isSlowOrStopped {
+            print("✅ Parking criteria met - confirming location")
+            confirmParkingLocation(at: currentLocation)
+        } else {
+            print("❌ Parking criteria not met")
+            autoParkingStatus = .failed
+            stopDrivingMode()
+        }
+    }
+    
+    private func confirmParkingLocation(at location: CLLocation) {
+        print("🎯 Confirming parking location at \(location.coordinate)")
+        
+        // Get address for the location
+        getSmartAddress(for: location.coordinate) { [weak self] address in
+            guard let self = self else { return }
+            
+            // Create parking location
+            let parkingLocation = ParkingLocation(
+                id: UUID(),
+                coordinate: location.coordinate,
+                address: address,
+                timestamp: Date(),
+                floor: nil,
+                notes: nil
+            )
+            
+            // Check if we're in a garage
+            self.performQuickGarageCheck(at: location) { isInGarage, garageName in
+                DispatchQueue.main.async {
+                    if isInGarage {
+                        // Send notification for floor selection
+                        self.sendParkingNotification(for: parkingLocation, garageName: garageName)
+                    } else {
+                        // Save regular parking location
+                        self.saveParkedLocation(parkingLocation)
+                        self.sendParkingNotification(for: parkingLocation, garageName: nil)
+                    }
+                    
+                    self.autoParkingStatus = .confirmed
+                    self.stopDrivingMode()
+                }
+            }
+        }
+    }
+    
+    private func sendParkingNotification(for location: ParkingLocation, garageName: String?) {
+        let content = UNMutableNotificationContent()
+        
+        if let garageName = garageName {
+            content.title = "🚗 Car parked at \(garageName)"
+            content.body = "Tap to select your floor level"
+        } else {
+            content.title = "🚗 Car parked near \(location.address)"
+            content.body = "Tap to add notes or edit location"
+        }
+        
+        content.sound = .default
+        content.categoryIdentifier = "PARKING_DETECTION"
+        
+        // Store location data in user info for notification handling
+        content.userInfo = [
+            "locationId": location.id.uuidString,
+            "latitude": location.coordinate.latitude,
+            "longitude": location.coordinate.longitude,
+            "address": location.address,
+            "garageName": garageName ?? ""
+        ]
+        
+        let request = UNNotificationRequest(
+            identifier: "auto-parking-\(location.id.uuidString)",
+            content: content,
+            trigger: nil
+        )
+        
+        UNUserNotificationCenter.current().add(request) { error in
+            if let error = error {
+                print("❌ Failed to send parking notification: \(error.localizedDescription)")
+            } else {
+                print("✅ Parking notification sent")
+            }
+        }
+    }
+    
+    // MARK: - Notification Action Handling
+    
+    func handleNotificationAction(_ actionIdentifier: String, userInfo: [AnyHashable: Any]) {
+        switch actionIdentifier {
+        case "SELECT_FLOOR":
+            handleSelectFloorAction(userInfo: userInfo)
+        case "EDIT_LOCATION":
+            handleEditLocationAction(userInfo: userInfo)
+        case "DISMISS":
+            handleDismissAction(userInfo: userInfo)
+        default:
+            print("⚠️ Unknown notification action: \(actionIdentifier)")
+        }
+    }
+    
+    private func handleSelectFloorAction(userInfo: [AnyHashable: Any]) {
+        // This will be handled by the UI to show floor picker
+        // The notification will bring the app to foreground
+        print("🎯 User tapped 'Select Floor' - will show floor picker")
+    }
+    
+    private func handleEditLocationAction(userInfo: [AnyHashable: Any]) {
+        // This will be handled by the UI to show parking details
+        print("✏️ User tapped 'Edit Location' - will show parking details")
+    }
+    
+    private func handleDismissAction(userInfo: [AnyHashable: Any]) {
+        // Just dismiss the notification, no action needed
+        print("❌ User dismissed parking notification")
     }
     
     private func startAltimeter() {
@@ -441,6 +767,32 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
         // Ensure this runs on the main thread as it's a UI-triggered action
         DispatchQueue.main.async {
             self.locationManager.requestLocation()
+        }
+    }
+    
+    // MARK: - Automatic Parking Detection Control
+    
+    func enableAutoParkingDetection() {
+        isAutoParkingEnabled = true
+        if CMMotionActivityManager.isActivityAvailable() {
+            startMotionActivityMonitoring()
+        }
+        print("✅ Automatic parking detection enabled")
+    }
+    
+    func disableAutoParkingDetection() {
+        isAutoParkingEnabled = false
+        stopMotionActivityMonitoring()
+        autoParkingTimer?.invalidate()
+        autoParkingStatus = .idle
+        print("❌ Automatic parking detection disabled")
+    }
+    
+    func toggleAutoParkingDetection() {
+        if isAutoParkingEnabled {
+            disableAutoParkingDetection()
+        } else {
+            enableAutoParkingDetection()
         }
     }
     
@@ -1537,6 +1889,18 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
         // This prevents the compilation error while maintaining the existing logic
     }
     
+    // MARK: - Location History Management
+    
+    private func updateLocationHistory(with location: CLLocation) {
+        // Add new location to history
+        locationHistory.append(location)
+        
+        // Keep only the most recent locations
+        if locationHistory.count > maxLocationHistory {
+            locationHistory.removeFirst(locationHistory.count - maxLocationHistory)
+        }
+    }
+    
     // MARK: - CLLocationManagerDelegate
     
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
@@ -1569,7 +1933,10 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
             }
         }
         
-        // Check for parking detection
+        // Update location history for automatic parking detection
+        updateLocationHistory(with: location)
+        
+        // Check for parking detection (existing manual detection)
         checkForParkingDetection()
     }
     
@@ -1611,6 +1978,10 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
             locationManager.startUpdatingLocation()
             if CMAltimeter.isRelativeAltitudeAvailable() {
                 startAltimeter()
+            }
+            // Start motion detection for automatic parking
+            if isAutoParkingEnabled && CMMotionActivityManager.isActivityAvailable() {
+                startMotionActivityMonitoring()
             }
         case .denied, .restricted:
             print("❌ Location access denied or restricted")
