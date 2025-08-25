@@ -412,8 +412,9 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
                 id: UUID(),
                 coordinate: location.coordinate,
                 address: address,
-                timestamp: Date(),
                 floor: nil,
+                timestamp: Date(),
+                garageName: nil,
                 notes: nil
             )
             
@@ -425,7 +426,7 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
                         self.sendParkingNotification(for: parkingLocation, garageName: garageName)
                     } else {
                         // Save regular parking location
-                        self.saveParkedLocation(parkingLocation)
+                        self.saveParkedLocation(floor: nil, notes: nil)
                         self.sendParkingNotification(for: parkingLocation, garageName: nil)
                     }
                     
