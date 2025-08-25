@@ -207,7 +207,7 @@ class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
         locationManager.delegate = self
         locationManager.desiredAccuracy = kCLLocationAccuracyNearestTenMeters
         locationManager.distanceFilter = 100 // Increased to prevent tiny movements from triggering updates
-        locationManager.allowsBackgroundLocationUpdates = false
+        locationManager.allowsBackgroundLocationUpdates = true
         locationManager.pausesLocationUpdatesAutomatically = true
     }
     
