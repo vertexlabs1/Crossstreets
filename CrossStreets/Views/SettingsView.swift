@@ -62,6 +62,58 @@ struct SettingsView: View {
                             .tracking(0.5)
                         
                         VStack(spacing: 12) {
+                            // Automatic Parking Detection Toggle
+                            VStack(spacing: 8) {
+                                HStack {
+                                    Image(systemName: "car.fill")
+                                        .font(.system(size: 16))
+                                        .foregroundColor(.blue)
+                                    
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text("Automatic Parking Detection")
+                                            .font(.system(size: 16, weight: .semibold))
+                                            .foregroundColor(.primary)
+                                        
+                                        Text(locationManager.isAutoParkingEnabled ? "Detects when you park automatically" : "Manual parking detection only")
+                                            .font(.system(size: 14))
+                                            .foregroundColor(.secondary)
+                                    }
+                                    
+                                    Spacer()
+                                    
+                                    Toggle("", isOn: Binding(
+                                        get: { locationManager.isAutoParkingEnabled },
+                                        set: { newValue in
+                                            HapticManager.lightImpact()
+                                            if newValue {
+                                                locationManager.enableAutoParkingDetection()
+                                            } else {
+                                                locationManager.disableAutoParkingDetection()
+                                            }
+                                        }
+                                    ))
+                                    .toggleStyle(SwitchToggleStyle(tint: .blue))
+                                }
+                                .padding(.vertical, 4)
+                                
+                                // Status indicator
+                                if locationManager.isAutoParkingEnabled {
+                                    HStack {
+                                        Image(systemName: "circle.fill")
+                                            .font(.system(size: 8))
+                                            .foregroundColor(.green)
+                                        Text("Status: \(locationManager.autoParkingStatus.description)")
+                                            .font(.system(size: 12))
+                                            .foregroundColor(.secondary)
+                                    }
+                                    .padding(.leading, 24)
+                                }
+                            }
+                            .padding(.vertical, 8)
+                            .padding(.horizontal, 12)
+                            .background(Color(.systemGray6))
+                            .cornerRadius(12)
+                            
                             SettingsRow(
                                 icon: "building.fill",
                                 title: "Garage Detection",
