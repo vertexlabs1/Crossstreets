@@ -136,8 +136,6 @@ struct ContentView: View {
                         showHistorySheet: $showHistorySheet,
                         showSettingsSheet: $showSettingsSheet
                     )
-                    .background(Color(.systemBackground))
-                    .ignoresSafeArea(.container, edges: .bottom)
                 }
                 .padding(.horizontal, 16)
                 .background(
@@ -145,10 +143,10 @@ struct ContentView: View {
                         .cornerRadius(28, corners: [UIRectCorner.topLeft, UIRectCorner.topRight])
                         .shadow(color: .black.opacity(0.1), radius: 25, y: -10)
                 )
-                .mask(
-                    RoundedRectangle(cornerRadius: 28)
-                        .padding(.bottom, -50) // Extend mask below visible area to prevent corner transparency
+                .clipShape(
+                    RoundedCorner(radius: 28, corners: [UIRectCorner.topLeft, UIRectCorner.topRight])
                 )
+                .ignoresSafeArea(.container, edges: .bottom)
             }
             
             if showingFloorPicker {

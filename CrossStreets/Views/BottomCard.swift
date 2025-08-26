@@ -46,7 +46,6 @@ struct BottomCard: View {
                 }
             }
         }
-        .background(Color(.systemBackground))
         .contentShape(Rectangle()) // Make entire area tappable
         .gesture(
             DragGesture(minimumDistance: 20)
