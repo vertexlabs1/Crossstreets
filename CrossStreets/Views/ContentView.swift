@@ -102,9 +102,38 @@ struct ContentView: View {
             VStack {
                 Spacer()
                 
-                // Custom location button positioned above bottom card
-                HStack {
-                    Spacer()
+                // BottomCard container with location button overlay
+                ZStack(alignment: .bottomTrailing) {
+                        VStack(spacing: 0) {
+                            if selectedTab == 0 {
+                                BottomCard(
+                                    locationManager: locationManager,
+                                    showingFloorPicker: $showingFloorPicker,
+                                    detectedGarageName: $detectedGarageName
+                                )
+                            }
+                            Divider()
+                            TabBarView(
+                                selectedTab: $selectedTab,
+                                showHistorySheet: $showHistorySheet,
+                                showSettingsSheet: $showSettingsSheet
+                            )
+                        }
+                        .padding(.horizontal, 16)
+                        .background(
+                            Color(.systemBackground)
+                                .ignoresSafeArea(.container, edges: .bottom)
+                        )
+                        .mask(
+                            VStack(spacing: 0) {
+                                RoundedCorner(radius: 28, corners: [UIRectCorner.topLeft, UIRectCorner.topRight])
+                                Rectangle()
+                                    .ignoresSafeArea(.container, edges: .bottom)
+                            }
+                        )
+                        .shadow(color: .black.opacity(0.1), radius: 25, y: -10)
+                    
+                    // Location button positioned in bottom-right above BottomCard
                     Button(action: {
                         if let location = locationManager.currentLocation {
                             centerMapOnUser(location: location)
@@ -119,37 +148,8 @@ struct ContentView: View {
                             .shadow(color: .black.opacity(0.2), radius: 8, y: 4)
                     }
                     .padding(.trailing, 20)
-                    .padding(.bottom, 20)
+                    .padding(.bottom, 80) // Position above the TabBar area
                 }
-                
-                VStack(spacing: 0) {
-                    if selectedTab == 0 {
-                        BottomCard(
-                            locationManager: locationManager,
-                            showingFloorPicker: $showingFloorPicker,
-                            detectedGarageName: $detectedGarageName
-                        )
-                    }
-                    Divider()
-                    TabBarView(
-                        selectedTab: $selectedTab,
-                        showHistorySheet: $showHistorySheet,
-                        showSettingsSheet: $showSettingsSheet
-                    )
-                }
-                .padding(.horizontal, 16)
-                .background(
-                    Color(.systemBackground)
-                        .ignoresSafeArea(.container, edges: .bottom)
-                )
-                .mask(
-                    VStack(spacing: 0) {
-                        RoundedCorner(radius: 28, corners: [UIRectCorner.topLeft, UIRectCorner.topRight])
-                        Rectangle()
-                            .ignoresSafeArea(.container, edges: .bottom)
-                    }
-                )
-                .shadow(color: .black.opacity(0.1), radius: 25, y: -10)
             }
             
             if showingFloorPicker {
