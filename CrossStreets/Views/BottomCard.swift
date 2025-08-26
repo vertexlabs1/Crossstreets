@@ -46,11 +46,7 @@ struct BottomCard: View {
                 }
             }
         }
-        .background(
-            Color(.systemBackground)
-                .cornerRadius(20, corners: [UIRectCorner.topLeft, UIRectCorner.topRight])
-                .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: -5)
-        )
+        .background(Color(.systemBackground))
         .contentShape(Rectangle()) // Make entire area tappable
         .gesture(
             DragGesture(minimumDistance: 20)
