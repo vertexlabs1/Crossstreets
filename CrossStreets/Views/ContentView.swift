@@ -136,6 +136,8 @@ struct ContentView: View {
                         showHistorySheet: $showHistorySheet,
                         showSettingsSheet: $showSettingsSheet
                     )
+                    .background(Color(.systemBackground))
+                    .ignoresSafeArea(.container, edges: .bottom)
                 }
                 .padding(.horizontal, 16)
                 .background(
