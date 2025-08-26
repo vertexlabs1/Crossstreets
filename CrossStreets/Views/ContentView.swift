@@ -122,43 +122,34 @@ struct ContentView: View {
                     .padding(.bottom, 20)
                 }
                 
-                ZStack(alignment: .bottom) {
-                    // Main content with proper corner radius
-                    VStack(spacing: 0) {
-                        if selectedTab == 0 {
-                            BottomCard(
-                                locationManager: locationManager,
-                                showingFloorPicker: $showingFloorPicker,
-                                detectedGarageName: $detectedGarageName
-                            )
-                        }
-                        Divider()
-                        TabBarView(
-                            selectedTab: $selectedTab,
-                            showHistorySheet: $showHistorySheet,
-                            showSettingsSheet: $showSettingsSheet
+                VStack(spacing: 0) {
+                    if selectedTab == 0 {
+                        BottomCard(
+                            locationManager: locationManager,
+                            showingFloorPicker: $showingFloorPicker,
+                            detectedGarageName: $detectedGarageName
                         )
                     }
-                    .padding(.horizontal, 16)
-                    .background(
-                        Color(.systemBackground)
-                            .cornerRadius(28, corners: [UIRectCorner.topLeft, UIRectCorner.topRight])
-                            .shadow(color: .black.opacity(0.1), radius: 25, y: -10)
+                    Divider()
+                    TabBarView(
+                        selectedTab: $selectedTab,
+                        showHistorySheet: $showHistorySheet,
+                        showSettingsSheet: $showSettingsSheet
                     )
-                    .clipShape(
+                }
+                .padding(.horizontal, 16)
+                .background(
+                    Color(.systemBackground)
+                        .ignoresSafeArea(.container, edges: .bottom)
+                )
+                .mask(
+                    VStack(spacing: 0) {
                         RoundedCorner(radius: 28, corners: [UIRectCorner.topLeft, UIRectCorner.topRight])
-                    )
-                    
-                    // Safe area extension for TabBar only
-                    VStack {
-                        Spacer()
                         Rectangle()
-                            .fill(Color(.systemBackground))
-                            .frame(height: 50) // Approximate safe area height
-                            .padding(.horizontal, 16)
                             .ignoresSafeArea(.container, edges: .bottom)
                     }
-                }
+                )
+                .shadow(color: .black.opacity(0.1), radius: 25, y: -10)
             }
             
             if showingFloorPicker {
