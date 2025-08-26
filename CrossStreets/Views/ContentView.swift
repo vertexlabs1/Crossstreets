@@ -59,7 +59,6 @@ struct ContentView: View {
             }
             .mapStyle(.standard)
             .mapControls { 
-                MapUserLocationButton()
                 MapCompass()
                 MapScaleView()
             }
@@ -101,6 +100,26 @@ struct ContentView: View {
             
             VStack {
                 Spacer()
+                
+                // Custom location button positioned above bottom card
+                HStack {
+                    Spacer()
+                    Button(action: {
+                        if let location = locationManager.currentLocation {
+                            centerMapOnUser(location: location)
+                        }
+                    }) {
+                        Image(systemName: "location.fill")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundColor(.white)
+                            .frame(width: 44, height: 44)
+                            .background(Color.blue)
+                            .clipShape(Circle())
+                            .shadow(color: .black.opacity(0.2), radius: 8, y: 4)
+                    }
+                    .padding(.trailing, 20)
+                    .padding(.bottom, 20)
+                }
                 
                 VStack(spacing: 0) {
                     if selectedTab == 0 {
