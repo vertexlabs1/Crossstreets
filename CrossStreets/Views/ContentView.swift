@@ -142,13 +142,13 @@ struct ContentView: View {
                 .padding(.horizontal, 16)
                 .background(
                     Color(.systemBackground)
-                        .clipShape(
-                            RoundedRectangle(cornerRadius: 28)
-                                .offset(y: 50) // Extend background below visible area
-                        )
+                        .cornerRadius(28, corners: [UIRectCorner.topLeft, UIRectCorner.topRight])
                         .shadow(color: .black.opacity(0.1), radius: 25, y: -10)
                 )
-                .clipped()
+                .mask(
+                    RoundedRectangle(cornerRadius: 28)
+                        .padding(.bottom, -50) // Extend mask below visible area to prevent corner transparency
+                )
             }
             
             if showingFloorPicker {
@@ -238,4 +238,5 @@ struct ContentView: View {
 #Preview {
     ContentView()
 }
+
 
