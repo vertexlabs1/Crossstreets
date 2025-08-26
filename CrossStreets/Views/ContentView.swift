@@ -142,9 +142,13 @@ struct ContentView: View {
                 .padding(.horizontal, 16)
                 .background(
                     Color(.systemBackground)
-                        .cornerRadius(28, corners: [UIRectCorner.topLeft, UIRectCorner.topRight])
+                        .clipShape(
+                            RoundedRectangle(cornerRadius: 28)
+                                .offset(y: 50) // Extend background below visible area
+                        )
                         .shadow(color: .black.opacity(0.1), radius: 25, y: -10)
                 )
+                .clipped()
             }
             
             if showingFloorPicker {
@@ -173,8 +177,18 @@ struct ContentView: View {
         .sheet(isPresented: $showHistorySheet) {
             HistoryView(locationManager: locationManager, selectedTab: $selectedTab)
         }
+        .onChange(of: showHistorySheet) { _, isShowing in
+            if !isShowing {
+                selectedTab = 0 // Return to Parking tab when sheet is dismissed
+            }
+        }
         .sheet(isPresented: $showSettingsSheet) {
             SettingsView(locationManager: locationManager, selectedTab: $selectedTab)
+        }
+        .onChange(of: showSettingsSheet) { _, isShowing in
+            if !isShowing {
+                selectedTab = 0 // Return to Parking tab when sheet is dismissed
+            }
         }
         .alert("Error", isPresented: $showErrorAlert) {
             Button("OK") { }
