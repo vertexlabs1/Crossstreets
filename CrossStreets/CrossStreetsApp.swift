@@ -2,7 +2,7 @@ import SwiftUI
 import Network
 
 @main
-struct CrossStreetsApp: App {
+struct SpotsaverApp: App {
     @State private var showSplash = true
     @State private var isOnline = true
     @State private var showOfflineAlert = false
@@ -110,7 +110,7 @@ struct CrossStreetsApp: App {
     }
     
     private func handleDeepLink(url: URL) {
-        guard url.scheme == "crossstreets" else { return }
+        guard url.scheme == "spotsaver" else { return }
         
         // Handle widget deep link
         if url.host == nil || url.host == "" {

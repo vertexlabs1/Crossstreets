@@ -191,7 +191,7 @@ struct SettingsView: View {
                             SettingsRow(
                                 icon: "rectangle.3.group.fill",
                                 title: "Add Widget",
-                                subtitle: "Long press home screen → Add Widget → CrossStreets",
+                                subtitle: "Long press home screen → Add Widget → spotsaver",
                                 iconColor: .blue,
                                 isActionable: true,
                                 action: showWidgetInstructions
@@ -242,7 +242,7 @@ struct SettingsView: View {
                             
                             SettingsRow(
                                 icon: "iphone.circle.fill",
-                                title: "CrossStreets v1.0 Beta",
+                                title: "spotsaver v1.0 Beta",
                                 subtitle: "Never lose your car again",
                                 iconColor: .blue
                             )
@@ -382,8 +382,8 @@ struct SettingsView: View {
     
     private func showWidgetInstructions() {
         let alert = UIAlertController(
-            title: "Add CrossStreets Widget",
-            message: "1. Long press on your home screen\n2. Tap the '+' button\n3. Search for 'CrossStreets'\n4. Choose widget size and add",
+            title: "Add spotsaver Widget",
+            message: "1. Long press on your home screen\n2. Tap the '+' button\n3. Search for 'spotsaver'\n4. Choose widget size and add",
             preferredStyle: .alert
         )
         alert.addAction(UIAlertAction(title: "OK", style: .default))

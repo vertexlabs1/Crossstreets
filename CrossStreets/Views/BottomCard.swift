@@ -6,16 +6,7 @@ struct BottomCard: View {
     @Binding var detectedGarageName: String?
     @State private var showingParkingDetails = false
     
-    // MARK: - Gesture Configuration
-    private var gestureConfiguration: GestureConfiguration {
-        let screenHeight = UIScreen.main.bounds.height
-        return GestureConfiguration(
-            minimumDistance: 20,
-            dismissThreshold: screenHeight * 0.08, // 8% of screen height
-            velocityThreshold: 800, // Apple's recommended velocity threshold
-            animationDuration: 0.3 // Consistent with system animations
-        )
-    }
+
     
     private var parkingDetailsSheet: some View {
         Group {
@@ -60,7 +51,7 @@ struct BottomCard: View {
         .shadow(color: .black.opacity(0.1), radius: 10, x: 0, y: -5)
         .contentShape(Rectangle()) // Make entire area tappable
         .gesture(
-            DragGesture(minimumDistance: gestureConfiguration.minimumDistance)
+            DragGesture(minimumDistance: 20)
                 .onEnded { value in
                     handleGestureEnd(value: value)
                 }
@@ -92,16 +83,19 @@ struct BottomCard: View {
         let velocity = value.velocity.height
         let velocityHeight = velocity.isFinite ? velocity : 0
         
+        // Use fixed thresholds that work well for swipe gestures
+        let dismissThreshold: CGFloat = -50 // 50 points upward swipe
+        let velocityThreshold: CGFloat = -800 // Fast upward swipe
+        
         // Use screen-relative thresholds and Apple's recommended velocity
-        let shouldOpen = translationHeight < -gestureConfiguration.dismissThreshold || 
-                        velocityHeight < -gestureConfiguration.velocityThreshold
+        let shouldOpen = translationHeight < dismissThreshold || velocityHeight < velocityThreshold
         
         if shouldOpen {
             // Strategic haptic feedback for gesture completion
             HapticManager.mediumImpact()
             
             // Animate with consistent timing
-            withAnimation(.easeInOut(duration: gestureConfiguration.animationDuration)) {
+            withAnimation(.easeInOut(duration: 0.3)) {
                 showingParkingDetails = true
             }
         }
@@ -117,19 +111,13 @@ struct BottomCard: View {
         HapticManager.lightImpact()
         
         // Animate with consistent timing
-        withAnimation(.easeInOut(duration: gestureConfiguration.animationDuration)) {
+        withAnimation(.easeInOut(duration: 0.3)) {
             showingParkingDetails = true
         }
     }
 }
 
-// MARK: - Gesture Configuration
-private struct GestureConfiguration {
-    let minimumDistance: CGFloat
-    let dismissThreshold: CGFloat
-    let velocityThreshold: CGFloat
-    let animationDuration: Double
-}
+
 
 #Preview {
     BottomCard(

@@ -118,7 +118,7 @@ struct ContentView: View {
                             .clipShape(Circle())
                             .shadow(color: .black.opacity(0.2), radius: 8, y: 4)
                     }
-                    .padding(.trailing, 32)
+                    .padding(.trailing, 20)
                     .padding(.bottom, 20)
                 }
                 
@@ -142,7 +142,6 @@ struct ContentView: View {
                     Color(.systemBackground)
                         .cornerRadius(28, corners: [UIRectCorner.topLeft, UIRectCorner.topRight])
                         .shadow(color: .black.opacity(0.1), radius: 25, y: -10)
-                        .edgesIgnoringSafeArea(.bottom)
                 )
             }
             

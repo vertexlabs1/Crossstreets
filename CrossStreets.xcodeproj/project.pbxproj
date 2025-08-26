@@ -588,7 +588,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = CrossStreets/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = CrossStreets;
+				INFOPLIST_KEY_CFBundleDisplayName = spotsaver;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.navigation";
 				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "CrossStreets uses background location for auto-parking detection.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "CrossStreets needs location to find your parking spot.";
@@ -624,7 +624,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = CrossStreets/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = CrossStreets;
+				INFOPLIST_KEY_CFBundleDisplayName = spotsaver;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.navigation";
 				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "CrossStreets uses background location for auto-parking detection.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "CrossStreets needs location to find your parking spot.";

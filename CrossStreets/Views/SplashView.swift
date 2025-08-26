@@ -2,31 +2,37 @@ import SwiftUI
 
 struct SplashView: View {
     var body: some View {
-        ZStack {
-            // Use the splash image as background
-            Image("SplashImage")
-                .resizable()
-                .aspectRatio(contentMode: .fill)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .clipped()
-                .ignoresSafeArea()
-            
-            // Optional overlay for additional branding
-            VStack {
-                Spacer()
+        GeometryReader { geometry in
+            ZStack {
+                // Use a solid background color that matches the splash image
+                Color.blue
+                    .ignoresSafeArea()
                 
-                VStack(spacing: 8) {
-                    Text("CROSSSTREETS")
-                        .font(.system(size: 20, weight: .bold, design: .rounded))
-                        .foregroundColor(.white)
-                        .tracking(2)
+                // Use the splash image with proper scaling
+                Image("SplashImage")
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(maxWidth: geometry.size.width, maxHeight: geometry.size.height)
+                    .clipped()
+                
+                // Overlay text positioned properly within safe area
+                VStack {
+                    Spacer()
                     
-                    Text("BETA")
-                        .font(.system(size: 10, weight: .semibold))
-                        .foregroundColor(.white.opacity(0.9))
-                        .tracking(1)
+                    VStack(spacing: 8) {
+                        Text("SPOTSAVER")
+                            .font(.system(size: 20, weight: .bold, design: .rounded))
+                            .foregroundColor(.white)
+                            .tracking(2)
+                        
+                        Text("BETA")
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundColor(.white.opacity(0.9))
+                            .tracking(1)
+                    }
+                    .padding(.bottom, 60)
                 }
-                .padding(.bottom, 60)
+                .padding(.horizontal, 20)
             }
         }
     }
