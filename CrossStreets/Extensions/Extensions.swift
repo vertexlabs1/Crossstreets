@@ -32,7 +32,72 @@ struct RoundedCorner: Shape {
     var corners: UIRectCorner = .allCorners
     
     func path(in rect: CGRect) -> Path {
-        let path = UIBezierPath(roundedRect: rect, byRoundingCorners: corners, cornerRadii: CGSize(width: radius, height: radius))
-        return Path(path.cgPath)
+        var path = Path()
+        
+        let width = rect.size.width
+        let height = rect.size.height
+        
+        // Ensure radius doesn't exceed half the smallest dimension
+        let effectiveRadius = min(radius, min(width, height) / 2)
+        
+        // Start from top-left
+        path.move(to: CGPoint(x: corners.contains(.topLeft) ? effectiveRadius : 0, y: 0))
+        
+        // Top edge
+        path.addLine(to: CGPoint(x: width - (corners.contains(.topRight) ? effectiveRadius : 0), y: 0))
+        
+        // Top-right corner
+        if corners.contains(.topRight) {
+            path.addArc(center: CGPoint(x: width - effectiveRadius, y: effectiveRadius),
+                       radius: effectiveRadius,
+                       startAngle: Angle(degrees: -90),
+                       endAngle: Angle(degrees: 0),
+                       clockwise: false)
+        } else {
+            path.addLine(to: CGPoint(x: width, y: 0))
+        }
+        
+        // Right edge
+        path.addLine(to: CGPoint(x: width, y: height - (corners.contains(.bottomRight) ? effectiveRadius : 0)))
+        
+        // Bottom-right corner
+        if corners.contains(.bottomRight) {
+            path.addArc(center: CGPoint(x: width - effectiveRadius, y: height - effectiveRadius),
+                       radius: effectiveRadius,
+                       startAngle: Angle(degrees: 0),
+                       endAngle: Angle(degrees: 90),
+                       clockwise: false)
+        } else {
+            path.addLine(to: CGPoint(x: width, y: height))
+        }
+        
+        // Bottom edge
+        path.addLine(to: CGPoint(x: corners.contains(.bottomLeft) ? effectiveRadius : 0, y: height))
+        
+        // Bottom-left corner
+        if corners.contains(.bottomLeft) {
+            path.addArc(center: CGPoint(x: effectiveRadius, y: height - effectiveRadius),
+                       radius: effectiveRadius,
+                       startAngle: Angle(degrees: 90),
+                       endAngle: Angle(degrees: 180),
+                       clockwise: false)
+        } else {
+            path.addLine(to: CGPoint(x: 0, y: height))
+        }
+        
+        // Left edge
+        path.addLine(to: CGPoint(x: 0, y: corners.contains(.topLeft) ? effectiveRadius : 0))
+        
+        // Top-left corner
+        if corners.contains(.topLeft) {
+            path.addArc(center: CGPoint(x: effectiveRadius, y: effectiveRadius),
+                       radius: effectiveRadius,
+                       startAngle: Angle(degrees: 180),
+                       endAngle: Angle(degrees: 270),
+                       clockwise: false)
+        }
+        
+        path.closeSubpath()
+        return path
     }
 }
